@@ -1,8 +1,7 @@
 // src/context/AuthContext.js
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { auth, db } from '../firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+// Migré vers Supabase — voir docs/ARCHITECTURE.md (ADR-002).
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({});
 
@@ -11,44 +10,81 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfile = useCallback(async (userId) => {
+    // On récupère le profil public et son profil privé associé (1:1) en une
+    // seule requête grâce à l'embedding PostgREST (profiles_private.id ->
+    // profiles.id, cf migration Module 1).
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*, profiles_private(*)')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Erreur chargement profil Supabase:', error.message);
+      setProfile(null);
+      return;
+    }
+    setProfile(data);
+  }, []);
+
+  const refreshProfile = useCallback(() => {
+    if (user?.id) fetchProfile(user.id);
+  }, [user, fetchProfile]);
+
   useEffect(() => {
-    // 1. Écoute de l'état d'authentification
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
+    let profileChannel;
 
-        // 2. Écoute du profil Firestore uniquement si on a un UID
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        
-        const unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            setProfile(docSnap.data());
-          } else {
-            console.log("Profil non trouvé dans Firestore");
-            setProfile(null);
-          }
-          setLoading(false); // Fin du chargement dès qu'on a une réponse (positive ou vide)
-        }, (error) => {
-          // Si l'erreur est "Missing or insufficient permissions"
-          console.error("Erreur Permission Firestore:", error.message);
-          setLoading(false);
-        });
-
-        // Nettoyage de l'écouteur de profil
-        return () => unsubscribeProfile();
+    // 1. Session initiale
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
       } else {
-        // 3. Reset complet si déconnecté
-        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    // 2. Écoute des changements d'auth (login/logout/refresh token)
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id).finally(() => setLoading(false));
+      } else {
         setProfile(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribeAuth();
-  }, []);
+    return () => {
+      authSubscription.unsubscribe();
+      if (profileChannel) supabase.removeChannel(profileChannel);
+    };
+  }, [fetchProfile]);
+
+  // 3. Écoute temps réel des changements du profil public (équivalent de
+  //    l'ancien onSnapshot Firestore)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`profile-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        () => fetchProfile(user.id)
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [user?.id, fetchProfile]);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, authenticated: !!user }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading, authenticated: !!user, refreshProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -1,123 +1,116 @@
 // src/services/AuthService.js
-import { auth, db } from '../firebase/config'; 
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+//
+// Source unique de vérité pour l'authentification (Supabase). Remplace l'ancien
+// src/firebase/auth.js et l'ancienne version Firebase de ce fichier — voir
+// docs/ARCHITECTURE.md (ADR-002, ADR-003).
+//
+// ⚠️ Prérequis côté dashboard Supabase pour que register() fonctionne tel quel :
+// Authentication > Providers > Email > désactiver "Confirm email" en développement
+// (sinon aucune session active n'existe encore au moment de l'insertion du
+// profil, et la policy RLS "profiles_insert_own" refusera l'écriture). En
+// production, on préférera confirmer l'email puis créer le profil après
+// confirmation (Phase 1).
+import { supabase } from '../lib/supabase';
 
-// CONFIGURATION CLOUDINARY
-const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dt3u4rorg/image/upload";
-const UPLOAD_PRESET = "Godwin296";
+// CONFIGURATION CLOUDINARY (inchangé — indépendant du choix de backend)
+const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dt3u4rorg/image/upload';
+const UPLOAD_PRESET = 'Godwin296';
 
-/**
- * Fonction pour envoyer une image vers Cloudinary
- * Remplace l'ancienne fonction uploadImageAsync de Firebase
- */
 const uploadToCloudinary = async (uri) => {
   if (!uri) return null;
-  
   try {
     const formData = new FormData();
-    formData.append('file', {
-      uri: uri,
-      type: 'image/jpeg', // Cloudinary gérera l'extension automatiquement
-      name: 'upload.jpg',
-    });
+    formData.append('file', { uri, type: 'image/jpeg', name: 'upload.jpg' });
     formData.append('upload_preset', UPLOAD_PRESET);
 
     const response = await fetch(CLOUDINARY_URL, {
       method: 'POST',
       body: formData,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { Accept: 'application/json', 'Content-Type': 'multipart/form-data' },
     });
-
     const data = await response.json();
-    
-    if (data.secure_url) {
-      console.log("✅ Upload Cloudinary réussi:", data.secure_url);
-      return data.secure_url;
-    } else {
-      console.error("❌ Erreur Cloudinary:", data.error?.message);
-      return null;
-    }
+
+    if (data.secure_url) return data.secure_url;
+    console.error('❌ Erreur Cloudinary:', data.error?.message);
+    return null;
   } catch (error) {
-    console.error("❌ Erreur Réseau Cloudinary:", error);
+    console.error('❌ Erreur Réseau Cloudinary:', error);
     return null;
   }
 };
 
+// Normalise le "level" du formulaire d'inscription vers le schéma DB
+// (particulier_level: 'etudiant' | 'travailleur' | null). Voir SignupScreen.js.
+const toParticulierLevel = (accountType, level) => {
+  if (accountType?.toUpperCase() !== 'PARTICULIER') return null;
+  return level?.toUpperCase() === 'ETUDIANT' ? 'etudiant' : 'travailleur';
+};
+
 export const authService = {
+  /**
+   * Inscription. Garde la même signature que la version précédente
+   * (email, password, userData) pour ne pas casser SignupScreen.js.
+   * userData attendu : { pseudo, phone, whatsapp, realName, accountType,
+   *                       level, mainSkill, neighborhood, avatar, realPhoto }
+   */
   register: async (email, password, userData) => {
-    try {
-      // 1. Création du compte dans Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+    // 1. Création du compte (Supabase Auth)
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (authError) throw authError;
 
-      // 2. Upload des images vers Cloudinary (Zéro carte bancaire requise !)
-      const avatarUrl = await uploadToCloudinary(userData.avatar);
-      const realPhotoUrl = await uploadToCloudinary(userData.realPhoto);
-
-      // 3. Construction du profil final pour Firestore
-      const fullUserData = {
-        uid: user.uid,
-        auth: {
-          email: email,
-          phone: userData.phone || '',
-          whatsapp: userData.whatsapp || '',
-          createdAt: serverTimestamp(),
-        },
-        identity: {
-          public: {
-            pseudo: userData.pseudo,
-            avatar: avatarUrl || '', 
-            isVerified: false,
-          },
-          private: {
-            realName: userData.realName,
-            realPhoto: realPhotoUrl || '',
-          }
-        },
-        status: {
-          accountType: userData.accountType, 
-          level: userData.level || 'ETUDIANT',
-          subscription: {
-            current: 'STANDARD',
-            expiresAt: null,
-          }
-        },
-        professional: {
-          mainSkill: userData.mainSkill,
-          city: 'Dschang',
-          neighborhood: userData.neighborhood || '',
-          rating: 0.0,
-          reviewCount: 0,
-        },
-        metadata: {
-          dataSaverEnabled: true,
-          lastSeen: serverTimestamp(),
-        }
-      };
-
-      // 4. Sauvegarde des données textuelles dans Firestore
-      await setDoc(doc(db, "users", user.uid), fullUserData);
-      
-      return user;
-    } catch (error) {
-      console.error("Erreur lors de l'inscription:", error);
-      throw error;
+    const user = authData.user;
+    if (!user) {
+      throw new Error(
+        "Compte créé mais aucune session active (email de confirmation requis ?). " +
+          'Voir le commentaire en tête de ce fichier.'
+      );
     }
+
+    // 2. Upload des images vers Cloudinary
+    const [avatarUrl, realPhotoUrl] = await Promise.all([
+      uploadToCloudinary(userData.avatar),
+      uploadToCloudinary(userData.realPhoto),
+    ]);
+
+    // 3. Profil public (table `profiles`)
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: user.id,
+      pseudo: userData.pseudo,
+      avatar_url: avatarUrl || null,
+      account_type: userData.accountType?.toLowerCase() || 'particulier',
+      particulier_level: toParticulierLevel(userData.accountType, userData.level),
+      neighborhood: userData.neighborhood || '',
+      main_skill: userData.mainSkill || '',
+    });
+    if (profileError) throw profileError;
+
+    // 4. Profil privé (ligne déjà créée par le trigger `on_profile_created` —
+    //    voir supabase/migrations/0001_module1_identity.sql — on la complète)
+    const { error: privateError } = await supabase
+      .from('profiles_private')
+      .update({
+        phone: userData.phone || '',
+        whatsapp: userData.whatsapp || '',
+        real_name: userData.realName || '',
+        real_photo_url: realPhotoUrl || null,
+      })
+      .eq('id', user.id);
+    if (privateError) throw privateError;
+
+    return user;
   },
 
   login: async (email, password) => {
-    try {
-      return await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      throw error;
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data.user;
   },
 
   logout: async () => {
-    return await signOut(auth);
-  }
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  },
 };
