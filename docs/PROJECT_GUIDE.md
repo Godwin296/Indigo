@@ -9,6 +9,16 @@ Indigo est un réseau social professionnel hyper-local (Dschang/Cameroun) qui
 connecte artisans, freelances, étudiants et entreprises, avec une confiance basée
 sur la preuve (réalisations, contrats, avis) plutôt que sur le déclaratif.
 
+## Travail en parallèle sur plusieurs discussions
+Si Godwin mène plusieurs discussions de développement en parallèle, le travail
+est découpé en 4 chantiers indépendants, chacun sur sa propre branche Git —
+voir **`docs/WORKSTREAMS.md`**. Avant de coder quoi que ce soit dans une
+nouvelle discussion :
+1. Demander à Godwin quel chantier est concerné s'il ne l'a pas précisé.
+2. Se placer sur la branche correspondante (`git checkout track-x-...`).
+3. Ne modifier que les fichiers listés dans le périmètre de ce chantier —
+   pour les fichiers "partagés", prévenir avant de toucher.
+
 ## Où trouver quoi
 - `docs/ARCHITECTURE.md` — **toutes** les décisions techniques, avec leur raison
   et leurs compromis assumés (stack, backend, schéma de données, arbitrages
