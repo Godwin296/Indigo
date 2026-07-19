@@ -1,42 +1,99 @@
-import { db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+// src/services/PostService.js
+// Module 2 : Flux de publications & moteur de confiance. Voir
+// docs/ARCHITECTURE.md et supabase/migrations/0003_module2_posts.sql.
+import { supabase } from '../lib/supabase';
+import { uploadToCloudinary } from '../utils/cloudinary';
 
-const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dt3u4rorg/image/upload";
-const UPLOAD_PRESET = "Godwin296";
+const FEED_PAGE_SIZE = 10;
 
 export const postService = {
-  createPost: async (userId, userProfile, postData, imageUri) => {
-    try {
-      // 1. Upload Cloudinary
-      let imageUrl = "";
-      if (imageUri) {
-        const formData = new FormData();
-        formData.append('file', { uri: imageUri, type: 'image/jpeg', name: 'post.jpg' });
-        formData.append('upload_preset', UPLOAD_PRESET);
-        const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
-        const data = await res.json();
-        imageUrl = data.secure_url;
+  /**
+   * Crée une publication. `mediaUris` est un tableau d'URIs locales (picker),
+   * uploadées vers Cloudinary avant écriture en base.
+   */
+  createPost: async (userId, profile, postData, mediaUris = []) => {
+    const uploadedMedia = (
+      await Promise.all(
+        mediaUris.map(async (uri) => {
+          const url = await uploadToCloudinary(uri);
+          return url ? { url, type: 'photo' } : null;
+        })
+      )
+    ).filter(Boolean);
+
+    const { data, error } = await supabase
+      .from('posts')
+      .insert({
+        user_id: userId,
+        post_type: postData.postType,
+        title: postData.title,
+        description: postData.description,
+        category: postData.category || profile?.main_skill || null,
+        price: postData.price ? parseFloat(postData.price) : null,
+        city: profile?.city || 'Dschang',
+        neighborhood: profile?.neighborhood || null,
+        media: uploadedMedia,
+        is_urgent: postData.postType === 'urgence',
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Charge une page du flux (publications actives uniquement, les plus
+   * récentes d'abord), avec le profil auteur en une seule requête.
+   */
+  fetchFeed: async ({ page = 0 } = {}) => {
+    const from = page * FEED_PAGE_SIZE;
+    const to = from + FEED_PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from('posts')
+      .select(
+        `*, author:profiles!posts_user_id_fkey (
+          pseudo, avatar_url, main_skill, city, neighborhood,
+          rating_average, rating_count, verified_badge
+        )`
+      )
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+    return data;
+  },
+
+  /** Publications d'un utilisateur donné (son propre profil, réalisations...) */
+  fetchUserPosts: async (userId) => {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  /** Signalement communautaire (Module 2 §1). Un seul signalement par personne. */
+  reportPost: async (postId, reporterId, reason) => {
+    const { error } = await supabase
+      .from('post_reports')
+      .insert({ post_id: postId, reporter_id: reporterId, reason });
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('Tu as déjà signalé cette publication.');
       }
-
-      // 2. Enregistrement Firestore avec structure de sécurité
-      await addDoc(collection(db, "posts"), {
-        userId,
-        authorName: userProfile.identity.public.pseudo,
-        authorAvatar: userProfile.identity.public.avatar,
-        content: postData.content,
-        imageUrl,
-        price: postData.price || null,
-        category: userProfile.professional.mainSkill,
-        location: userProfile.professional.neighborhood || "Dschang",
-        status: "DISPONIBLE", // Auto-cleaning : passera à "ACHEMINÉ" plus tard
-        isQuarantine: false, // Niveau 2 : Système d'alarme
-        reportCount: 0,
-        createdAt: serverTimestamp(),
-      });
-
-      return { success: true };
-    } catch (error) {
       throw error;
     }
-  }
+  },
+
+  deletePost: async (postId) => {
+    const { error } = await supabase.from('posts').delete().eq('id', postId);
+    if (error) throw error;
+  },
 };

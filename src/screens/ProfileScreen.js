@@ -13,22 +13,44 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
+import { postService } from '../services/PostService';
 
 const { width } = Dimensions.get('window');
-const AVATAR_SIZE = 140; 
+const AVATAR_SIZE = 140;
 
-export default function ProfileScreen() {
-  const { profile } = useAuth();
+const AVAILABILITY_LABELS = {
+  disponible: 'Disponible',
+  occupe: 'Occupé',
+  indisponible: 'Indisponible',
+};
+
+export default function ProfileScreen({ navigation }) {
+  const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState('Aperçu');
+  const [userPosts, setUserPosts] = useState([]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    postService
+      .fetchUserPosts(user.id)
+      .then(setUserPosts)
+      .catch((e) => console.error('Erreur chargement publications:', e.message));
+  }, [user?.id]);
+
+  const realisations = userPosts.filter((p) => p.post_type === 'realisation');
 
   // --- ÉTATS POUR L'ANIMATION DU NOM ---
   const [isRealIdentity, setIsRealIdentity] = useState(false);
-  const [displayName, setDisplayName] = useState(profile?.identity?.public?.pseudo || "Utilisateur");
+  const pseudo = profile?.pseudo || 'Utilisateur';
+  const realName = profile?.profiles_private?.real_name || pseudo;
+  const [displayName, setDisplayName] = useState(pseudo);
 
-  const pseudo = profile?.identity?.public?.pseudo || "Utilisateur"; // Assure-toi que pseudo existe dans ton profil
-  const realName = profile?.identity?.private?.realName || "Junior Touco"; // Assure-toi que fullName existe dans ton profil
-  const socialAvatar = profile?.identity?.public?.avatar || 'https://i.pravatar.cc/300';
-  const realPhoto = profile?.identity?.private?.realPhoto || 'https://i.pravatar.cc/400';
+  const socialAvatar = profile?.avatar_url || 'https://i.pravatar.cc/300';
+  const realPhoto = profile?.profiles_private?.real_photo_url || socialAvatar;
+  const coverImage = profile?.cover_url || 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=1200';
+  const memberSince = profile?.created_at
+    ? `${Math.max(1, Math.floor((Date.now() - new Date(profile.created_at).getTime()) / (365 * 24 * 3600 * 1000)))} an(s)`
+    : '—';
 
   // --- LOGIQUE TYPEWRITER (Machine à écrire) ---
   useEffect(() => {
@@ -71,29 +93,35 @@ export default function ProfileScreen() {
             <View style={styles.row}>
               <View style={styles.halfColumn}>
                 <Text style={styles.sectionTitle}>À propos</Text>
-                <AboutItem label="Spécialité" value="Développement Web & Mobile Fullstack" />
-                <AboutItem label="Expérience" value="3+ ans d'expérience" />
-                <AboutItem label="Disponibilité" value="Disponible" isTag />
-                <AboutItem label="Quartier" value={profile?.professional?.neighborhood || "Fongo, Dschang"} />
+                <AboutItem label="Spécialité" value={profile?.main_skill || 'Non renseigné'} />
+                <AboutItem label="Expérience" value={profile?.experience_years ? `${profile.experience_years}+ ans d'expérience` : 'Non renseigné'} />
+                <AboutItem label="Disponibilité" value={AVAILABILITY_LABELS[profile?.availability] || 'Non renseigné'} isTag />
+                <AboutItem label="Quartier" value={profile?.neighborhood || profile?.city || 'Dschang'} />
               </View>
               <View style={styles.halfColumn}>
                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Compétences</Text>
-                    <Text style={styles.viewAll}>Voir tout</Text>
+                    <Text style={styles.sectionTitle}>Compétence principale</Text>
                  </View>
-                 <SkillItem name="React Native" level={0.95} />
-                 <SkillItem name="Node.js & Express" level={0.85} />
-                 <SkillItem name="UI/UX (Figma)" level={0.90} />
+                 {profile?.main_skill ? (
+                   <SkillItem name={profile.main_skill} level={0.9} />
+                 ) : (
+                   <Text style={styles.aboutValue}>Ajoute ta compétence dans "Modifier le profil"</Text>
+                 )}
 
-                 <View style={[styles.expertCard, {marginTop: 20}]}>
+                 <TouchableOpacity
+                   style={[styles.expertCard, { marginTop: 20 }]}
+                   onPress={() => !profile?.verified_badge && navigation.navigate('RequestVerification')}
+                 >
                     <LinearGradient colors={['#3F37C9', '#6C3BFF']} style={styles.expertIcon}>
                       <MaterialCommunityIcons name="crown" size={22} color="#E4B04E" />
                     </LinearGradient>
                     <View style={{marginLeft: 12}}>
-                      <Text style={styles.expertTitle}>Expert Vérifié</Text>
-                      <Text style={styles.expertSub}>Profil certifié Indigo</Text>
+                      <Text style={styles.expertTitle}>{profile?.verified_badge ? 'Expert Vérifié' : 'Pas encore vérifié'}</Text>
+                      <Text style={styles.expertSub}>
+                        {profile?.verified_badge ? 'Profil certifié Indigo' : 'Toucher pour demander la vérification'}
+                      </Text>
                     </View>
-                 </View>
+                 </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -103,25 +131,29 @@ export default function ProfileScreen() {
         return (
           <View style={styles.contentSection}>
             <Text style={styles.sectionTitle}>Projets récents</Text>
-            <View style={styles.galleryGrid}>
-              {/* Ajout de ?w=500 pour charger des images plus légères sur tablette */}
-              <View style={styles.galleryCard}>
-                <Image source={{ uri: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=500' }} style={styles.galleryImg} />
-                <Text style={styles.galleryTitle}>App E-commerce</Text>
+            {realisations.length === 0 ? (
+              <Text style={styles.aboutValue}>
+                Aucune réalisation publiée pour l'instant — publie une "Réalisation" depuis l'onglet Publier.
+              </Text>
+            ) : (
+              <View style={styles.galleryGrid}>
+                {realisations.map((post) => (
+                  <View key={post.id} style={styles.galleryCard}>
+                    <Image
+                      source={{ uri: post.media?.[0]?.url || 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=500' }}
+                      style={styles.galleryImg}
+                    />
+                    <Text style={styles.galleryTitle}>{post.title}</Text>
+                  </View>
+                ))}
               </View>
-              <View style={styles.galleryCard}>
-                <Image source={{ uri: 'https://images.unsplash.com/photo-1551288049-bbbda536339a?w=500' }} style={styles.galleryImg} />
-                <Text style={styles.galleryTitle}>Dashboard Admin</Text>
-              </View>
-              <View style={styles.galleryCard}>
-                <Image source={{ uri: 'https://images.unsplash.com/photo-1522542550221-31fd19255a7a?w=500' }} style={styles.galleryImg} />
-                <Text style={styles.galleryTitle}>Refonte UI Indigo</Text>
-              </View>
-            </View>
+            )}
           </View>
         );
 
       case 'Avis':
+        // Système d'avis réel = Module 4 (notation post-contrat), Chantier C.
+        // Exemple illustratif en attendant.
         return (
           <View style={styles.contentSection}>
             <Text style={styles.sectionTitle}>Avis clients (156)</Text>
@@ -139,11 +171,22 @@ export default function ProfileScreen() {
         );
 
       case 'Services':
+        const services = userPosts.filter((p) => p.post_type === 'service');
         return (
           <View style={styles.contentSection}>
             <Text style={styles.sectionTitle}>Mes Services</Text>
-            <ServiceItem title="Application Mobile" desc="React Native Expert" price="Dès 250.000 FCFA" />
-            <ServiceItem title="Maintenance" desc="Correction de bugs" price="50.000 FCFA / j" />
+            {services.length === 0 ? (
+              <Text style={styles.aboutValue}>Aucun service publié pour l'instant.</Text>
+            ) : (
+              services.map((s) => (
+                <ServiceItem
+                  key={s.id}
+                  title={s.title}
+                  desc={s.description}
+                  price={s.price ? `Dès ${s.price} FCFA` : 'Prix sur demande'}
+                />
+              ))
+            )}
           </View>
         );
 
@@ -151,9 +194,9 @@ export default function ProfileScreen() {
         return (
           <View style={styles.contentSection}>
             <Text style={styles.sectionTitle}>Informations privées</Text>
-            <InfoItem icon="mail" label="Email" value={isRealIdentity ? (profile?.auth?.email || "junior.touco@indigo.com") : "••••••••@indigo.com"} />
-            <InfoItem icon="call" label="Numéro" value={isRealIdentity ? "+237 6xx xxx xxx" : "+237 •••••••••"} />
-            <InfoItem icon="pin" label="Adresse" value="Entrée Chefferie, Fongo-Tongo" />
+            <InfoItem icon="mail" label="Email" value={isRealIdentity ? (profile?.profiles_private?.email || 'Non renseigné') : '••••••••@indigo.com'} />
+            <InfoItem icon="call" label="Numéro" value={isRealIdentity ? (profile?.profiles_private?.phone || 'Non renseigné') : '+237 •••••••••'} />
+            <InfoItem icon="pin" label="Quartier" value={profile?.neighborhood || profile?.city || 'Dschang'} />
           </View>
         );
       default: return null;
@@ -166,13 +209,13 @@ export default function ProfileScreen() {
         
         {/* HEADER */}
         <ImageBackground 
-          source={{ uri: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?q=80&w=1200' }} 
+          source={{ uri: coverImage }} 
           style={styles.coverImage}
         >
           <LinearGradient colors={['rgba(5,5,48,0.2)', 'rgba(5,5,48,1)']} style={styles.coverOverlay}>
-             <TouchableOpacity style={styles.backBtn}><Ionicons name="chevron-back" size={24} color="white" /></TouchableOpacity>
-             <TouchableOpacity style={styles.settingsBtn}><Ionicons name="settings-outline" size={24} color="white" /></TouchableOpacity>
-             <TouchableOpacity style={styles.editCoverBtn}>
+             <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}><Ionicons name="chevron-back" size={24} color="white" /></TouchableOpacity>
+             <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('EditProfile')}><Ionicons name="settings-outline" size={24} color="white" /></TouchableOpacity>
+             <TouchableOpacity style={styles.editCoverBtn} onPress={() => navigation.navigate('EditProfile')}>
                 <Ionicons name="camera-outline" size={16} color="white" />
                 <Text style={styles.editCoverText}>Modifier</Text>
              </TouchableOpacity>
@@ -195,10 +238,10 @@ export default function ProfileScreen() {
                 <Image key={realPhoto} source={{ uri: realPhoto }} style={styles.avatarSlide} />
               </ScrollView>
             </View>
-            <TouchableOpacity style={styles.avatarEditBtn}><Ionicons name="camera" size={18} color="white" /></TouchableOpacity>
+            <TouchableOpacity style={styles.avatarEditBtn} onPress={() => navigation.navigate('EditProfile')}><Ionicons name="camera" size={18} color="white" /></TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.editProfileFloat}><Ionicons name="pencil" size={22} color="white" /></TouchableOpacity>
+          <TouchableOpacity style={styles.editProfileFloat} onPress={() => navigation.navigate('EditProfile')}><Ionicons name="pencil" size={22} color="white" /></TouchableOpacity>
 
           <View style={styles.nameContainer}>
             <View style={styles.nameRow}>
@@ -207,31 +250,31 @@ export default function ProfileScreen() {
               <MaterialCommunityIcons 
                 name={isRealIdentity ? "shield-check" : "check-decagram"} 
                 size={24} 
-                color={isRealIdentity ? "#4CAF50" : "#E4B04E"} 
+                color={isRealIdentity ? "#4CAF50" : (profile?.verified_badge ? "#E4B04E" : "#555")} 
               />
             </View>
             <Text style={styles.userHandle}>
-                {isRealIdentity ? "Identité Réelle Vérifiée" : `@${pseudo.toLowerCase().replace(/\s/g, '_')}`}
+                {isRealIdentity ? "Identité Réelle" : `@${pseudo.toLowerCase().replace(/\s/g, '_')}`}
             </Text>
           </View>
 
           <View style={styles.statusRow}>
             <View style={styles.onlineBadge} />
-            <Text style={styles.statusText}>En ligne • <Text style={{color: COLORS.primary}}>Développeur</Text></Text>
+            <Text style={styles.statusText}>{AVAILABILITY_LABELS[profile?.availability] || 'Disponible'} • <Text style={{color: COLORS.primary}}>{profile?.main_skill || 'Talent'}</Text></Text>
             <Ionicons name="location" size={14} color={COLORS.primary} style={{marginLeft: 15}} />
-            <Text style={styles.statusText}>{profile?.professional?.neighborhood || "Dschang"}</Text>
+            <Text style={styles.statusText}>{profile?.neighborhood || profile?.city || 'Dschang'}</Text>
           </View>
 
-          <Text style={styles.bioText}>Expert en solutions numériques à Dschang. Transformons vos idées en applications performantes. 🚀</Text>
+          <Text style={styles.bioText}>{profile?.bio || 'Aucune bio pour l’instant — ajoute-la depuis "Modifier le profil".'}</Text>
 
           <View style={styles.statsContainer}>
-            <StatItem label="Note" value="4,8" icon="star" color="#E4B04E" />
+            <StatItem label="Note" value={profile?.rating_average ? profile.rating_average.toFixed(1) : '—'} icon="star" color="#E4B04E" />
             <View style={styles.statDivider} />
-            <StatItem label="Contrats" value="32" />
+            <StatItem label="Contrats" value={profile?.contracts_completed ?? 0} />
             <View style={styles.statDivider} />
-            <StatItem label="Avis" value="156" />
+            <StatItem label="Avis" value={profile?.rating_count ?? 0} />
             <View style={styles.statDivider} />
-            <StatItem label="Ancienneté" value="2 ans" />
+            <StatItem label="Ancienneté" value={memberSince} />
           </View>
 
           <View style={styles.actionRow}>

@@ -11,6 +11,8 @@ import SignupScreen from '../screens/SignupScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import FeedScreen from '../screens/FeedScreen';
 import AddPostScreen from '../screens/AddPostScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import RequestVerificationScreen from '../screens/RequestVerificationScreen';
 
 import { useAuth } from '../context/AuthContext';
 import { COLORS } from '../theme/theme';
@@ -81,6 +83,27 @@ function MainTabs() {
   );
 }
 
+// Stack imbriquée : les tabs sont l'écran de base, les écrans "poussés"
+// (édition de profil, vérification...) s'affichent par-dessus, accessibles
+// depuis n'importe quel tab via navigation.navigate('EditProfile') etc.
+function MainStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: '#050530' } }}>
+      <Stack.Screen name="Tabs" component={MainTabs} />
+      <Stack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ headerShown: true, title: 'Modifier le profil', headerStyle: { backgroundColor: '#050530' }, headerTintColor: 'white' }}
+      />
+      <Stack.Screen
+        name="RequestVerification"
+        component={RequestVerificationScreen}
+        options={{ headerShown: true, title: 'Vérification', headerStyle: { backgroundColor: '#050530' }, headerTintColor: 'white' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 export default function AppNavigator() {
   const { user, loading } = useAuth();
 
@@ -96,7 +119,7 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: '#050530' } }}>
         {user ? (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen name="Main" component={MainStack} />
         ) : (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />

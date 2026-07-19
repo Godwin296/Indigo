@@ -51,6 +51,8 @@ nouvelle discussion :
    voir `docs/ROADMAP.md` pour l'ordre des priorités.
 
 ## Démarrer en local
+Voir `docs/LOCAL_DEV.md` pour l'environnement complet (Docker + Supabase CLI).
+Démarrage rapide sans CLI (contre le projet Supabase de production directement) :
 ```bash
 git clone https://github.com/Godwin296/Indigo.git
 cd Indigo

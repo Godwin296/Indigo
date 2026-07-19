@@ -4,15 +4,17 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/colors';
 
-export default function ComposerCards() {
+export default function ComposerCards({ onPress, avatarUrl }) {
   return (
     <View style={styles.card}>
       <View style={styles.topSection}>
         <View style={styles.inputArea}>
-          <Image source={{ uri: 'https://i.pravatar.cc/300' }} style={styles.avatar} />
-          <Text style={styles.placeholder}>Quoi de neuf aujourd’hui ?</Text>
+          <Image source={{ uri: avatarUrl || 'https://i.pravatar.cc/300' }} style={styles.avatar} />
+          <TouchableOpacity style={{ flex: 1 }} onPress={onPress}>
+            <Text style={styles.placeholder}>Quoi de neuf aujourd’hui ?</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity activeOpacity={0.8}>
+        <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
           <LinearGradient colors={[COLORS.primary, COLORS.primaryBright]} style={styles.publishBtn}>
             <Ionicons name="create-outline" size={18} color="white" />
             <Text style={styles.publishText}>Publier</Text>
@@ -20,17 +22,17 @@ export default function ComposerCards() {
         </TouchableOpacity>
       </View>
       <View style={styles.bottomActions}>
-        <ActionItem icon="image-outline" color={COLORS.danger} label="Photo" />
-        <ActionItem icon="videocam-outline" color={COLORS.primary} label="Vidéo" />
-        <ActionItem icon="briefcase-outline" color={COLORS.gold} label="Offre" isMCI />
-        <ActionItem icon="calendar-outline" color={COLORS.green} label="Event" />
+        <ActionItem icon="image-outline" color={COLORS.danger} label="Photo" onPress={onPress} />
+        <ActionItem icon="videocam-outline" color={COLORS.primary} label="Vidéo" onPress={onPress} />
+        <ActionItem icon="briefcase-outline" color={COLORS.gold} label="Offre" isMCI onPress={onPress} />
+        <ActionItem icon="calendar-outline" color={COLORS.green} label="Event" onPress={onPress} />
       </View>
     </View>
   );
 }
 
-const ActionItem = ({ icon, color, label, isMCI }) => (
-  <TouchableOpacity style={styles.actionItem}>
+const ActionItem = ({ icon, color, label, isMCI, onPress }) => (
+  <TouchableOpacity style={styles.actionItem} onPress={onPress}>
     {isMCI ? <MaterialCommunityIcons name={icon} size={20} color={color} /> : <Ionicons name={icon} size={20} color={color} />}
     <Text style={styles.actionLabel}>{label}</Text>
   </TouchableOpacity>
