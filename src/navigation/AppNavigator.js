@@ -11,6 +11,7 @@ import SignupScreen from '../screens/SignupScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import FeedScreen from '../screens/FeedScreen';
 import AddPostScreen from '../screens/AddPostScreen';
+import SearchScreen from '../screens/SearchScreen';
 
 import { useAuth } from '../context/AuthContext';
 import { COLORS } from '../theme/theme';
@@ -39,7 +40,7 @@ function MainTabs() {
       />
       <Tab.Screen 
         name="Recherche" 
-        component={View} 
+        component={SearchScreen} 
         options={{ 
           tabBarIcon: ({ color }) => <Feather name="search" size={24} color={color} /> 
         }}
