@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, Share } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
+import CommentsModal from './CommentsModal';
 
 const REPORT_REASONS = [
   { label: 'Futilité', value: 'futilite' },
@@ -11,8 +12,6 @@ const REPORT_REASONS = [
   { label: 'Spam', value: 'spam' },
 ];
 
-// Grille d'images qui s'adapte au nombre réel de médias (1 à N), au lieu de
-// supposer qu'il y en a toujours au moins 3 comme dans la version maquette figée.
 function ImageGrid({ images }) {
   if (!images || images.length === 0) return null;
 
@@ -49,6 +48,8 @@ function ImageGrid({ images }) {
 }
 
 export default function FeedPostCard({
+  postId,
+  userId,
   user,
   location,
   time,
@@ -62,13 +63,38 @@ export default function FeedPostCard({
   hashtags,
   price,
   isNew,
+  likeCount = 0,
+  commentCount = 0,
+  isLiked = false,
   onReport,
+  onLikeToggle,
 }) {
+  const [liked, setLiked] = useState(isLiked);
+  const [likes, setLikes] = useState(likeCount);
+  const [comments, setComments] = useState(commentCount);
+  const [commentsVisible, setCommentsVisible] = useState(false);
+
   const handleMenuPress = () => {
     Alert.alert('Signaler cette publication', 'Pourquoi la signales-tu ?', [
       ...REPORT_REASONS.map((r) => ({ text: r.label, onPress: () => onReport?.(r.value) })),
       { text: 'Annuler', style: 'cancel' },
     ]);
+  };
+
+  const handleLike = () => {
+    // Optimiste : on met à jour l'affichage tout de suite, avant la réponse
+    // serveur — cohérent avec le mode "Data Saver" (pas d'attente perçue).
+    setLiked((prev) => !prev);
+    setLikes((prev) => prev + (liked ? -1 : 1));
+    onLikeToggle?.(liked);
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({ message: `${title} — sur Indigo\n${description}` });
+    } catch (e) {
+      console.error('Erreur partage:', e.message);
+    }
   };
 
   return (
@@ -107,6 +133,31 @@ export default function FeedPostCard({
           </View>
         )}
       </View>
+
+      <View style={styles.actions}>
+        <View style={styles.actionGroup}>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
+            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={22} color={COLORS.danger} />
+            <Text style={styles.actionCount}>{likes}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setCommentsVisible(true)}>
+            <Ionicons name="chatbubble-outline" size={20} color="white" />
+            <Text style={styles.actionCount}>{comments}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+            <Ionicons name="share-social-outline" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
+        <Ionicons name="bookmark-outline" size={22} color="white" />
+      </View>
+
+      <CommentsModal
+        visible={commentsVisible}
+        postId={postId}
+        userId={userId}
+        onClose={() => setCommentsVisible(false)}
+        onCommentAdded={() => setComments((c) => c + 1)}
+      />
     </View>
   );
 }
@@ -133,8 +184,12 @@ const styles = StyleSheet.create({
   moreImagesContainer: { flex: 1, position: 'relative' },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   moreText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 15, paddingBottom: 5 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 15, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
   locationDetail: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   ratingBox: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   infoText: { color: COLORS.textSoft, fontSize: 12 },
+  actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionCount: { color: 'white', fontSize: 12 },
 });

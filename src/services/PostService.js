@@ -42,10 +42,7 @@ export const postService = {
     return data;
   },
 
-  /**
-   * Charge une page du flux (publications actives uniquement, les plus
-   * récentes d'abord), avec le profil auteur en une seule requête.
-   */
+  /** Charge une page du flux + les IDs des posts déjà likés par l'utilisateur. */
   fetchFeed: async ({ page = 0 } = {}) => {
     const from = page * FEED_PAGE_SIZE;
     const to = from + FEED_PAGE_SIZE - 1;
@@ -62,6 +59,47 @@ export const postService = {
       .order('created_at', { ascending: false })
       .range(from, to);
 
+    if (error) throw error;
+    return data;
+  },
+
+  /** IDs des publications déjà likées par l'utilisateur (pour l'état du cœur). */
+  fetchLikedPostIds: async (userId) => {
+    const { data, error } = await supabase.from('post_likes').select('post_id').eq('user_id', userId);
+    if (error) throw error;
+    return data.map((row) => row.post_id);
+  },
+
+  toggleLike: async (postId, userId, isCurrentlyLiked) => {
+    if (isCurrentlyLiked) {
+      const { error } = await supabase
+        .from('post_likes')
+        .delete()
+        .eq('post_id', postId)
+        .eq('user_id', userId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('post_likes').insert({ post_id: postId, user_id: userId });
+      if (error && error.code !== '23505') throw error; // 23505 = déjà liké, on ignore
+    }
+  },
+
+  fetchComments: async (postId) => {
+    const { data, error } = await supabase
+      .from('post_comments')
+      .select('*, author:profiles!post_comments_user_id_fkey (pseudo, avatar_url)')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data;
+  },
+
+  addComment: async (postId, userId, content) => {
+    const { data, error } = await supabase
+      .from('post_comments')
+      .insert({ post_id: postId, user_id: userId, content })
+      .select('*, author:profiles!post_comments_user_id_fkey (pseudo, avatar_url)')
+      .single();
     if (error) throw error;
     return data;
   },

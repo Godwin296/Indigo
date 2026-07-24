@@ -30,6 +30,7 @@ export default function FeedScreen({ navigation }) {
   const { contentMaxWidth } = useResponsive();
 
   const [posts, setPosts] = useState([]);
+  const [likedPostIds, setLikedPostIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -37,8 +38,12 @@ export default function FeedScreen({ navigation }) {
   const loadFeed = useCallback(async () => {
     try {
       setError(null);
-      const data = await postService.fetchFeed({ page: 0 });
-      setPosts(data);
+      const [feedData, likedIds] = await Promise.all([
+        postService.fetchFeed({ page: 0 }),
+        user?.id ? postService.fetchLikedPostIds(user.id) : Promise.resolve([]),
+      ]);
+      setPosts(feedData);
+      setLikedPostIds(likedIds);
     } catch (e) {
       console.error('Erreur chargement feed:', e.message);
       setError("Impossible de charger le fil pour l'instant.");
@@ -46,7 +51,7 @@ export default function FeedScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadFeed();
@@ -63,6 +68,15 @@ export default function FeedScreen({ navigation }) {
       await postService.reportPost(postId, user.id, reason);
     } catch (e) {
       console.error(e.message);
+    }
+  };
+
+  const handleLikeToggle = async (postId, wasLiked) => {
+    if (!user?.id) return;
+    try {
+      await postService.toggleLike(postId, user.id, wasLiked);
+    } catch (e) {
+      console.error('Erreur like:', e.message);
     }
   };
 
@@ -138,6 +152,8 @@ export default function FeedScreen({ navigation }) {
         {posts.map((post) => (
           <FeedPostCard
             key={post.id}
+            postId={post.id}
+            userId={user?.id}
             user={post.author?.pseudo || 'Utilisateur'}
             location={`${post.author?.main_skill || post.category || ''} • ${post.city}`}
             time={formatTimeAgo(post.created_at)}
@@ -150,7 +166,11 @@ export default function FeedScreen({ navigation }) {
             avatar={post.author?.avatar_url}
             images={(post.media || []).map((m) => m.url)}
             isNew={Date.now() - new Date(post.created_at).getTime() < 24 * 60 * 60 * 1000}
+            likeCount={post.like_count || 0}
+            commentCount={post.comment_count || 0}
+            isLiked={likedPostIds.includes(post.id)}
             onReport={(reason) => handleReport(post.id, reason)}
+            onLikeToggle={(wasLiked) => handleLikeToggle(post.id, wasLiked)}
           />
         ))}
       </ScrollView>
