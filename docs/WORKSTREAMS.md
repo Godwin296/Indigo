@@ -83,7 +83,7 @@ qu'un chantier casse le travail d'un autre sans le savoir :
 | Chantier | Branche | Statut |
 |---|---|---|
 | A — Profil & Publications | `track-a-profil-contenu` | 🟡 Prêt à démarrer |
-| B — Recherche & Découverte | `track-b-recherche` | 🟡 Prêt à démarrer |
+| B — Recherche & Découverte | `track-b-recherche` | 🔵 En cours (Talents/Entreprises faits, Services/Offres/Publications en attente du Chantier A) |
 | C — Messagerie & Confiance | `track-c-messagerie-confiance` | 🟡 Prêt à démarrer |
 | D — Monétisation & Admin | `track-d-monetisation-admin` | 🟡 Prêt à démarrer |
 
