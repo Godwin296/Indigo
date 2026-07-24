@@ -32,6 +32,12 @@ techniques.
 - [ ] Gestion des litiges (Module 7)
 - [ ] Dashboard admin custom si Supabase Studio devient insuffisant (Module 6)
 
+## Backlog (reporté, pas oublié)
+- Scroll infini sur le feed (à la Facebook/Instagram) au lieu du simple
+  chargement de la première page — décision de Godwin du 20/07/2026 : plus
+  adapté à ce type d'app que la pagination classique, mais pas prioritaire
+  tant que le volume de publications reste faible.
+
 ## Suivi
 Chaque case cochée correspond à un commit documenté. Les décisions ambiguës ou
 flexibles sont toujours posées à Godwin avant d'être tranchées (voir ADR-004 pour
