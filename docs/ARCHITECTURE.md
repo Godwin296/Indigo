@@ -107,8 +107,100 @@ l'accord de Godwin (18/07/2026) :
 
 ---
 
+## ADR-005 — Infrastructure locale, mode offline, compression, sécurité
+
+Décision prise suite à la demande de Godwin du 19/07/2026. Chaque point est traité
+séparément, avec ce qu'on adopte, ce qu'on adapte, et ce qu'on écarte (avec la
+raison).
+
+### 1. Docker — oui, mais pas pour ce que tu penses
+**Docker pour l'app mobile elle-même : non.** Expo/React Native tourne sur un
+simulateur ou un vrai téléphone, pas dans un conteneur — le conteneuriser
+n'apporterait rien et compliquerait le développement (accès caméra, GPS,
+notifications... tout ça ne marche pas bien depuis un conteneur Linux).
+
+**Docker pour l'environnement Supabase local : oui, et c'est très pertinent.**
+Le CLI officiel Supabase (`supabase start`) utilise Docker en interne pour
+lancer une stack Postgres + Auth + Storage **identique à la prod, en local, et
+gratuite**. C'est exactement l'outil pour "tester en local" sans toucher au
+projet de production à chaque migration. Voir `docs/LOCAL_DEV.md`.
+
+### 2. Fidélité aux maquettes
+Déjà le principe suivi depuis le début (ex : `FeedPostCard.js` reproduit l'image
+3 des maquettes presque à l'identique). Rien à changer, on continue comme ça.
+
+### 3. Mode offline
+Supabase n'a pas l'équivalent du cache offline automatique de Firestore (compromis
+déjà assumé en ADR-002). Construire une vraie synchronisation bidirectionnelle
+(écriture hors-ligne + résolution de conflits) maintenant serait un chantier à
+part entière, risqué si fait à la va-vite. On avance par étapes :
+- **Maintenant** : cache de lecture simple (AsyncStorage) pour le feed et les
+  profils déjà consultés — utilisable hors-ligne, avec indicateur "vu il y a
+  X min". Pas d'écriture hors-ligne pour l'instant (publier un post nécessite
+  une connexion).
+- **Phase 3** (déjà prévu dans `docs/ROADMAP.md`, Module 7) : vraie
+  synchronisation avec file d'attente d'actions en attente de réseau.
+
+### 4. Indexation PostgreSQL
+Déjà fait dans les migrations existantes : index sur `(status, created_at)`,
+`user_id`, `category`, `city` pour `posts`, et `city`, `main_skill`, `geopoint`
+(GIST) pour `profiles`. On garde ce réflexe à chaque nouvelle table.
+
+### 5. Compression réseau
+Supabase sert son API derrière un CDN qui gère déjà la compression HTTP standard
+(gzip/brotli) au niveau transport — ce n'est pas quelque chose à coder
+nous-mêmes, et y passer du temps de dev n'apporterait rien de plus que ce que la
+plateforme fait déjà.
+
+### 6. Compression de fichiers
+Déjà en place : Cloudinary + qualité 0.6 sur tous les pickers d'image (voir
+`ProfileImagePicker`, `AddPostScreen`). On applique systématiquement cette même
+règle à chaque nouvel endroit qui upload un fichier.
+
+### 7. Sécurité — ce qui est déjà en place
+- RLS activé sur **toutes** les tables (`profiles`, `profiles_private`, `posts`,
+  `post_reports`) — jamais de table ouverte par défaut.
+- Séparation public/privé dès le schéma (ADR-003), pas juste côté écran.
+- Compteur de tentatives de connexion échouées prévu dans le schéma
+  (`profiles_private.failed_login_attempts`) + protection native Supabase
+  (rate limiting / Attack Protection, vu ensemble dans le dashboard).
+- Assainissement des entrées utilisateur contre les caractères d'injection
+  (`src/utils/validators.js`).
+- Aucun secret dans le repo : `.env` ignoré par git, seule la clé publique
+  `anon` est utilisée côté app — la clé `service_role` ne sera **jamais**
+  utilisée ailleurs que dans une Edge Function (Chantier D).
+- Triggers Postgres qui empêchent un utilisateur normal de modifier lui-même
+  ses champs de modération (`posts.status`, `report_count` — voir migration
+  0003) ou ses données de confiance (`credibility_score`, `boosted_visible`).
+
+### 8. Sécurité — ce qu'on écarte pour l'instant (et pourquoi)
+**Détection anti-stéganographie dédiée : hors scope.** C'est un vrai sujet de
+recherche à part entière (analyse d'image, taux de faux positifs élevé), pas
+une fonctionnalité qu'on ajoute "en plus" à moindre coût. Pour un marketplace
+artisanal à ce stade (pas une plateforme à enjeu national), le rapport
+effort/risque ne le justifie pas. Si un vrai signal apparaît un jour (contenu
+illicite caché signalé concrètement), on traitera **ce cas précis** avec un
+outil ciblé plutôt que de construire un système préventif générique maintenant.
+Le vrai rempart contre le contenu malveillant reste la modération de contenu
+classique déjà prévue (Module 2 : filtre auto, signalement communautaire,
+quarantaine).
+
+**Chiffrement de bout en bout des messages : déjà tranché en ADR-004** (on reste
+sur chiffrement standard transit + stockage, pas de vrai E2EE, à cause de la
+contradiction avec l'arbitrage admin des litiges).
+
+### 9. Sécurité — prochaines étapes (progressives, pas toutes d'un coup)
+- Audit RLS systématique avant chaque nouvelle table mise en production.
+- Authentification à deux facteurs (Supabase Multi-Factor, vu dans le
+  dashboard) — à proposer en option utilisateur, Phase 2.
+- Rate limiting applicatif sur les actions sensibles (signalement, publication)
+  — Chantier D, avec les Edge Functions admin.
+
 ## Historique
 
+- 2026-07-19 — ADR-005 : environnement Supabase local via Docker/CLI, stratégie
+  offline progressive, clarification compression/sécurité, périmètre explicite
+  de ce qu'on n'implémente pas encore (anti-stéganographie) et pourquoi.
 - 2026-07-18 — ADR-001 à ADR-004 : bascule Firebase → Supabase, socle Expo
   universel, révisions réalistes du cahier des charges. Début de l'implémentation
   du Module 1 (Auth + Profil).

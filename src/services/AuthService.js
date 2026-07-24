@@ -11,33 +11,7 @@
 // production, on préférera confirmer l'email puis créer le profil après
 // confirmation (Phase 1).
 import { supabase } from '../lib/supabase';
-
-// CONFIGURATION CLOUDINARY (inchangé — indépendant du choix de backend)
-const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dt3u4rorg/image/upload';
-const UPLOAD_PRESET = 'Godwin296';
-
-const uploadToCloudinary = async (uri) => {
-  if (!uri) return null;
-  try {
-    const formData = new FormData();
-    formData.append('file', { uri, type: 'image/jpeg', name: 'upload.jpg' });
-    formData.append('upload_preset', UPLOAD_PRESET);
-
-    const response = await fetch(CLOUDINARY_URL, {
-      method: 'POST',
-      body: formData,
-      headers: { Accept: 'application/json', 'Content-Type': 'multipart/form-data' },
-    });
-    const data = await response.json();
-
-    if (data.secure_url) return data.secure_url;
-    console.error('❌ Erreur Cloudinary:', data.error?.message);
-    return null;
-  } catch (error) {
-    console.error('❌ Erreur Réseau Cloudinary:', error);
-    return null;
-  }
-};
+import { uploadToCloudinary } from '../utils/cloudinary';
 
 // Normalise le "level" du formulaire d'inscription vers le schéma DB
 // (particulier_level: 'etudiant' | 'travailleur' | null). Voir SignupScreen.js.
