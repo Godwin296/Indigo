@@ -56,6 +56,12 @@ export const chatService = {
     }));
   },
 
+  fetchConversation: async (conversationId) => {
+    const { data, error } = await supabase.from('conversations').select('*').eq('id', conversationId).single();
+    if (error) throw error;
+    return data;
+  },
+
   fetchMessages: async (conversationId) => {
     const { data, error } = await supabase
       .from('messages')
@@ -101,5 +107,21 @@ export const chatService = {
     });
     if (error) throw error;
     return data;
+  },
+
+  // --- Cycle de vie du Mode Contrat (Module 4 §1, niveau 3) ---
+  proposeContractMode: async (conversationId) => {
+    const { error } = await supabase.rpc('propose_contract_mode', { p_conversation_id: conversationId });
+    if (error) throw error;
+  },
+
+  confirmContractMode: async (conversationId) => {
+    const { error } = await supabase.rpc('confirm_contract_mode', { p_conversation_id: conversationId });
+    if (error) throw error;
+  },
+
+  completeContract: async (conversationId) => {
+    const { error } = await supabase.rpc('complete_contract', { p_conversation_id: conversationId });
+    if (error) throw error;
   },
 };

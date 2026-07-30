@@ -32,6 +32,15 @@ techniques.
 - [ ] Gestion des litiges (Module 7)
 - [ ] Dashboard admin custom si Supabase Studio devient insuffisant (Module 6)
 
+## Points d'intégration post-fusion (à ne pas oublier)
+- **Chantier B ↔ C** : le bouton "Contacter" de `SearchScreen` (Chantier B)
+  affiche actuellement un message "bientôt disponible" car la messagerie
+  n'existait pas encore. Une fois B et C fusionnés dans `main`, le brancher sur
+  `chatService.getOrCreateConversation(...)` + `navigation.navigate('Chat', ...)`.
+- **Chantier A ↔ C** : idem pour le bouton "Contacter" d'un profil consulté
+  (pas encore d'écran de profil public pour un tiers — seul le profil de
+  l'utilisateur connecté existe pour l'instant).
+
 ## Backlog (reporté, pas oublié)
 - Scroll infini sur le feed (à la Facebook/Instagram) au lieu du simple
   chargement de la première page — décision de Godwin du 20/07/2026 : plus

@@ -16,6 +16,7 @@ import {
   Platform,
   Alert,
   Linking,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
@@ -23,8 +24,12 @@ import { useAuth } from '../context/AuthContext';
 import { chatService } from '../services/chatService';
 import { blockService } from '../services/blockService';
 import { reportService } from '../services/reportService';
+import { disputeService } from '../services/disputeService';
+import { ratingService } from '../services/ratingService';
+import RatingModal from '../components/RatingModal';
 import { formatTimeAgo } from '../utils/formatTimeAgo';
 import { validatePostContent } from '../utils/validators';
+import * as ImagePicker from 'expo-image-picker';
 
 const TYPE_BANNER = {
   social: { label: 'Discussion sociale', desc: 'Échanges personnels et amicaux.', color: COLORS.gold, icon: 'people' },
@@ -43,6 +48,11 @@ export default function ChatScreen({ route, navigation }) {
   const { conversationId, conversationType, otherParticipant } = route.params;
   const { user } = useAuth();
 
+  const [conversation, setConversation] = useState({
+    type: conversationType,
+    contract_status: 'none',
+    proposed_by: null,
+  });
   const [identity, setIdentity] = useState({
     display_name: otherParticipant?.pseudo,
     display_photo: otherParticipant?.avatar_url,
@@ -51,16 +61,32 @@ export default function ChatScreen({ route, navigation }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [alreadyRated, setAlreadyRated] = useState(true);
+  const [ratingVisible, setRatingVisible] = useState(false);
+  const [dispute, setDispute] = useState(null);
   const listRef = useRef(null);
 
-  const banner = TYPE_BANNER[conversationType] || TYPE_BANNER.social;
+  const banner = TYPE_BANNER[conversation.type] || TYPE_BANNER.social;
+
+  const refreshConversationState = () => {
+    chatService.fetchConversation(conversationId).then(setConversation).catch((e) => console.error(e.message));
+    disputeService.fetchDisputeForConversation(conversationId).then(setDispute).catch((e) => console.error(e.message));
+  };
+
+  useEffect(() => {
+    refreshConversationState();
+    ratingService
+      .hasRated(conversationId, user.id)
+      .then((r) => setAlreadyRated(r))
+      .catch((e) => console.error(e.message));
+  }, [conversationId, user.id]);
 
   useEffect(() => {
     chatService
       .getParticipantIdentity(conversationId, otherParticipant.id)
       .then(setIdentity)
       .catch((e) => console.error('Erreur identité:', e.message));
-  }, [conversationId, otherParticipant.id]);
+  }, [conversationId, otherParticipant.id, conversation.type]);
 
   useEffect(() => {
     chatService
@@ -141,6 +167,73 @@ export default function ChatScreen({ route, navigation }) {
     ]);
   };
 
+  const handleProposeContract = async () => {
+    try {
+      await chatService.proposeContractMode(conversationId);
+      refreshConversationState();
+    } catch (e) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
+  const handleConfirmContract = async () => {
+    try {
+      await chatService.confirmContractMode(conversationId);
+      refreshConversationState();
+    } catch (e) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
+  const handleCompleteContract = () => {
+    Alert.alert('Marquer ce contrat comme terminé ?', 'Les deux parties pourront ensuite se noter.', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Confirmer',
+        onPress: async () => {
+          try {
+            await chatService.completeContract(conversationId);
+            refreshConversationState();
+          } catch (e) {
+            Alert.alert('Erreur', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const [disputeModalVisible, setDisputeModalVisible] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+
+  const submitDispute = async () => {
+    if (!disputeReason.trim()) return Alert.alert('Litige', 'Décris le problème rencontré.');
+    try {
+      await disputeService.fileDispute(conversationId, user.id, otherParticipant.id, disputeReason.trim());
+      setDisputeModalVisible(false);
+      setDisputeReason('');
+      refreshConversationState();
+    } catch (e) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
+  const handleSubmitProof = async () => {
+    if (!dispute) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('Permissions', 'Accès aux photos requis.');
+
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
+    if (result.canceled || !result.assets?.length) return;
+
+    try {
+      await disputeService.submitProof(dispute.id, result.assets[0].uri);
+      Alert.alert('Preuve envoyée', 'L’équipe Indigo va examiner ton dossier.');
+      refreshConversationState();
+    } catch (e) {
+      Alert.alert('Erreur', e.message);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -172,6 +265,22 @@ export default function ChatScreen({ route, navigation }) {
         </View>
       </View>
 
+      {conversation.contract_status === 'disputed' && (
+        <View style={styles.disputeBanner}>
+          <Ionicons name="warning" size={16} color={COLORS.danger} />
+          <Text style={styles.disputeText}>
+            {dispute?.reported_user_id === user.id
+              ? "Litige en cours — ton compte est temporairement gelé pour les nouveaux clients, en attente d'arbitrage."
+              : "Litige signalé — en attente d'arbitrage par l'équipe Indigo."}
+          </Text>
+          {dispute?.reported_user_id === user.id && !dispute?.proof_url && (
+            <TouchableOpacity onPress={handleSubmitProof} style={styles.proofBtn}>
+              <Text style={styles.proofBtnText}>Fournir une preuve</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <FlatList
         ref={listRef}
         data={messages}
@@ -179,6 +288,9 @@ export default function ChatScreen({ route, navigation }) {
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => {
+          if (item.is_system) {
+            return <Text style={styles.systemMessage}>{item.content}</Text>;
+          }
           const mine = item.sender_id === user.id;
           return (
             <View style={[styles.messageRow, mine ? styles.messageRowMine : styles.messageRowTheirs]}>
@@ -190,6 +302,41 @@ export default function ChatScreen({ route, navigation }) {
           );
         }}
       />
+
+      {/* Actions contextuelles selon l'état du contrat (Module 4 §1, niveau 3) */}
+      {conversation.type === 'professional' && conversation.contract_status === 'none' && (
+        <TouchableOpacity style={styles.actionBar} onPress={handleProposeContract}>
+          <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.blue} />
+          <Text style={styles.actionBarText}>Passer en Mode Contrat</Text>
+        </TouchableOpacity>
+      )}
+      {conversation.contract_status === 'pending' && conversation.proposed_by !== user.id && (
+        <TouchableOpacity style={styles.actionBar} onPress={handleConfirmContract}>
+          <Ionicons name="checkmark-circle-outline" size={16} color={COLORS.green} />
+          <Text style={styles.actionBarText}>Confirmer le Mode Contrat</Text>
+        </TouchableOpacity>
+      )}
+      {conversation.contract_status === 'pending' && conversation.proposed_by === user.id && (
+        <View style={styles.actionBarStatic}>
+          <Text style={styles.actionBarTextMuted}>En attente de confirmation de l'autre partie...</Text>
+        </View>
+      )}
+      {conversation.contract_status === 'active' && (
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.actionBarSmall} onPress={handleCompleteContract}>
+            <Text style={styles.actionBarTextSmall}>Marquer terminé</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.disputeBtnSmall} onPress={() => setDisputeModalVisible(true)}>
+            <Text style={styles.disputeBtnSmallText}>Signaler un litige</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {conversation.contract_status === 'completed' && !alreadyRated && (
+        <TouchableOpacity style={styles.actionBar} onPress={() => setRatingVisible(true)}>
+          <Ionicons name="star-outline" size={16} color={COLORS.gold} />
+          <Text style={styles.actionBarText}>Noter cette collaboration</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.inputRow}>
         <TextInput
@@ -204,7 +351,44 @@ export default function ChatScreen({ route, navigation }) {
           <Ionicons name="send" size={20} color={COLORS.text} />
         </TouchableOpacity>
       </View>
+
+      <RatingModal
+        visible={ratingVisible}
+        conversationId={conversationId}
+        raterId={user.id}
+        ratedId={otherParticipant.id}
+        onClose={() => setRatingVisible(false)}
+        onRated={() => setAlreadyRated(true)}
+      />
+
+      <Modal visible={disputeModalVisible} transparent animationType="fade" onRequestClose={() => setDisputeModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Signaler un litige</Text>
+            <Text style={styles.modalDesc}>
+              Le compte de l'autre partie sera temporairement gelé le temps de l'arbitrage.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Décris le problème rencontré..."
+              placeholderTextColor={COLORS.textMuted}
+              value={disputeReason}
+              onChangeText={setDisputeReason}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setDisputeModalVisible(false)}>
+                <Text style={styles.modalCancel}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={submitDispute} style={styles.modalSubmit}>
+                <Text style={styles.modalSubmitText}>Signaler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
+
   );
 }
 
@@ -266,4 +450,72 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  systemMessage: { color: COLORS.textMuted, fontSize: 11, textAlign: 'center', marginVertical: 4 },
+  disputeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,77,109,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,77,109,0.35)',
+  },
+  disputeText: { color: COLORS.text, fontSize: 12, flex: 1 },
+  proofBtn: { backgroundColor: COLORS.danger, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
+  proofBtnText: { color: COLORS.text, fontSize: 11, fontWeight: '700' },
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  actionBarText: { color: COLORS.text, fontWeight: '700', fontSize: 13 },
+  actionBarStatic: { alignItems: 'center', marginBottom: 8 },
+  actionBarTextMuted: { color: COLORS.textMuted, fontSize: 12, fontStyle: 'italic' },
+  actionRow: { flexDirection: 'row', gap: 10, marginHorizontal: 12, marginBottom: 8 },
+  actionBarSmall: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.green,
+  },
+  actionBarTextSmall: { color: COLORS.text, fontWeight: '700', fontSize: 12 },
+  disputeBtnSmall: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,77,109,0.15)',
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+  },
+  disputeBtnSmallText: { color: COLORS.danger, fontWeight: '700', fontSize: 12 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
+  modalSheet: { backgroundColor: COLORS.card, borderRadius: 20, padding: 20 },
+  modalTitle: { color: COLORS.text, fontSize: 17, fontWeight: '800', marginBottom: 6 },
+  modalDesc: { color: COLORS.textMuted, fontSize: 12, marginBottom: 14 },
+  modalInput: {
+    backgroundColor: COLORS.backgroundSecondary,
+    borderRadius: 12,
+    padding: 12,
+    color: COLORS.text,
+    minHeight: 80,
+    marginBottom: 16,
+  },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16 },
+  modalCancel: { color: COLORS.textMuted, paddingVertical: 10 },
+  modalSubmit: { backgroundColor: COLORS.danger, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 12 },
+  modalSubmitText: { color: COLORS.text, fontWeight: '700' },
 });
