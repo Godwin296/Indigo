@@ -13,6 +13,8 @@ import FeedScreen from '../screens/FeedScreen';
 import AddPostScreen from '../screens/AddPostScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import RequestVerificationScreen from '../screens/RequestVerificationScreen';
+import ConversationsListScreen from '../screens/ConversationsListScreen';
+import ChatScreen from '../screens/ChatScreen';
 
 import { useAuth } from '../context/AuthContext';
 import { COLORS } from '../theme/theme';
@@ -62,12 +64,11 @@ function MainTabs() {
       />
       <Tab.Screen 
         name="Messages" 
-        component={View} 
+        component={ConversationsListScreen} 
         options={{ 
           tabBarIcon: ({ color }) => (
             <View>
               <Feather name="message-square" size={24} color={color} />
-              <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
             </View>
           ) 
         }}
@@ -100,6 +101,7 @@ function MainStack() {
         component={RequestVerificationScreen}
         options={{ headerShown: true, title: 'Vérification', headerStyle: { backgroundColor: '#050530' }, headerTintColor: 'white' }}
       />
+      <Stack.Screen name="Chat" component={ChatScreen} />
     </Stack.Navigator>
   );
 }
