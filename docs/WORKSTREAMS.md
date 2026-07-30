@@ -82,9 +82,12 @@ qu'un chantier casse le travail d'un autre sans le savoir :
 ## État des chantiers
 | Chantier | Branche | Statut |
 |---|---|---|
-| A — Profil & Publications | `track-a-profil-contenu` | 🔵 En cours (Module 1 fini, Module 2 : posts + likes/commentaires faits) |
-| B — Recherche & Découverte | `track-b-recherche` | 🟡 Prêt à démarrer |
-| C — Messagerie & Confiance | `track-c-messagerie-confiance` | 🔵 Terminé pour son périmètre (conversations 3 niveaux, Mode Contrat, notation, litiges Module 7 §3) — prêt à relire/tester avant fusion |
+## État des chantiers
+| Chantier | Branche | Statut |
+|---|---|---|
+| A — Profil & Publications | `track-a-profil-contenu` | 🟢 Fusionné dans main (Module 1 fini, Module 2 : posts + likes/commentaires) |
+| B — Recherche & Découverte | `track-b-recherche` | 🟢 Fusionné dans main (Talents/Entreprises ; Services/Offres/Publications à activer maintenant que Module 2 est dans main) |
+| C — Messagerie & Confiance | `track-c-messagerie-confiance` | 🟢 Fusionné dans main (conversations 3 niveaux, Mode Contrat, notation, litiges Module 7 §3) |
 | D — Monétisation & Admin | `track-d-monetisation-admin` | 🟡 Prêt à démarrer |
 
 *(Mettre à jour ce tableau — 🟡 prêt / 🔵 en cours / 🟢 fusionné dans main — à
