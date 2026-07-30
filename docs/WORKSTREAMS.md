@@ -84,7 +84,7 @@ qu'un chantier casse le travail d'un autre sans le savoir :
 |---|---|---|
 | A — Profil & Publications | `track-a-profil-contenu` | 🔵 En cours (Module 1 fini, Module 2 : posts + likes/commentaires faits) |
 | B — Recherche & Découverte | `track-b-recherche` | 🟡 Prêt à démarrer |
-| C — Messagerie & Confiance | `track-c-messagerie-confiance` | 🟡 Prêt à démarrer |
+| C — Messagerie & Confiance | `track-c-messagerie-confiance` | 🔵 En cours (conversations 3 niveaux, messages temps réel, notation post-contrat faits) |
 | D — Monétisation & Admin | `track-d-monetisation-admin` | 🟡 Prêt à démarrer |
 
 *(Mettre à jour ce tableau — 🟡 prêt / 🔵 en cours / 🟢 fusionné dans main — à
