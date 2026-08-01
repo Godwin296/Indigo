@@ -22,6 +22,7 @@ import InputField from '../components/InputField';
 import Button from '../components/Button';
 
 const POST_TYPES = [
+  { value: 'promotion', label: 'Promotion', sub: 'Flyer / pub locale', icon: 'megaphone-outline', adminOnly: true },
   { value: 'service', label: 'Service', sub: 'Proposer un service', icon: 'construct-outline' },
   { value: 'offre_emploi', label: "Offre d'emploi", sub: 'Recruter', icon: 'briefcase-outline' },
   { value: 'recherche', label: 'Recherche', sub: 'Chercher un talent', icon: 'people-outline' },
@@ -29,13 +30,24 @@ const POST_TYPES = [
   { value: 'urgence', label: 'Urgence', sub: 'Besoin immédiat', icon: 'notifications-outline' },
 ];
 
+const PROMO_DURATIONS = [
+  { label: '7 jours', days: 7 },
+  { label: '14 jours', days: 14 },
+  { label: '30 jours', days: 30 },
+  { label: 'Sans limite', days: null },
+];
+
 const MAX_MEDIA = 5;
 
 export default function AddPostScreen({ navigation }) {
   const { user, profile } = useAuth();
   const { contentMaxWidth } = useResponsive();
+  const isAdmin = profile?.account_type === 'admin';
 
-  const [postType, setPostType] = useState('service');
+  const visiblePostTypes = POST_TYPES.filter((t) => !t.adminOnly || isAdmin);
+
+  const [postType, setPostType] = useState(visiblePostTypes[0]?.value || 'service');
+  const [promoDuration, setPromoDuration] = useState(PROMO_DURATIONS[1]); // 14 jours par défaut
   const [media, setMedia] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -74,16 +86,21 @@ export default function AddPostScreen({ navigation }) {
     const descCheck = validatePostContent(description);
     if (!descCheck.valid) return Alert.alert('Description', descCheck.error);
 
-    if (postType === 'realisation' && media.length === 0) {
-      return Alert.alert('Preuve requise', 'Une réalisation nécessite au moins une photo.');
+    if ((postType === 'realisation' || postType === 'promotion') && media.length === 0) {
+      return Alert.alert('Visuel requis', 'Une photo est nécessaire pour ce type de publication.');
     }
 
     setLoading(true);
     try {
+      const validUntil =
+        postType === 'promotion' && promoDuration.days
+          ? new Date(Date.now() + promoDuration.days * 24 * 60 * 60 * 1000).toISOString()
+          : null;
+
       await postService.createPost(
         user.id,
         profile,
-        { postType, title, description, category, price },
+        { postType, title, description, category, price, validUntil },
         media
       );
       Alert.alert('Publié !', 'Ta publication est en ligne.');
@@ -105,7 +122,7 @@ export default function AddPostScreen({ navigation }) {
 
       {/* Type de publication */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeRow}>
-        {POST_TYPES.map((t) => (
+        {visiblePostTypes.map((t) => (
           <TouchableOpacity
             key={t.value}
             onPress={() => setPostType(t.value)}
@@ -118,7 +135,27 @@ export default function AddPostScreen({ navigation }) {
         ))}
       </ScrollView>
 
-      {/* Médias */}
+      {postType === 'promotion' && (
+        <>
+          <Text style={styles.sectionTitle}>Durée de la promotion</Text>
+          <View style={styles.promoDurationRow}>
+            {PROMO_DURATIONS.map((d) => (
+              <TouchableOpacity
+                key={d.label}
+                onPress={() => setPromoDuration(d)}
+                style={[styles.promoChip, promoDuration.label === d.label && styles.promoChipActive]}
+              >
+                <Text style={[styles.promoChipText, promoDuration.label === d.label && styles.promoChipTextActive]}>
+                  {d.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.hint}>
+            La promotion disparaît automatiquement du flux à l'échéance (auto-nettoyage, Module 2).
+          </Text>
+        </>
+      )}
       <Text style={styles.sectionTitle}>Médias ({media.length}/{MAX_MEDIA})</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaRow}>
         <TouchableOpacity onPress={pickMedia} style={styles.addMediaBtn}>
@@ -204,6 +241,17 @@ const styles = StyleSheet.create({
   typeSub: { color: COLORS.textSecondary, fontSize: 10 },
   typeSubActive: { color: 'rgba(255,255,255,0.8)' },
   sectionTitle: { color: COLORS.white, fontSize: 15, fontWeight: '800', marginBottom: SPACING.s, marginTop: SPACING.s },
+  promoDurationRow: { flexDirection: 'row', gap: SPACING.s, marginBottom: SPACING.s, flexWrap: 'wrap' },
+  promoChip: {
+    paddingHorizontal: SPACING.m,
+    paddingVertical: SPACING.s,
+    borderRadius: BORDER_RADIUS.large,
+    backgroundColor: COLORS.cardBackground,
+  },
+  promoChipActive: { backgroundColor: '#E4B04E' },
+  promoChipText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
+  promoChipTextActive: { color: '#050530' },
+  hint: { color: COLORS.textSecondary, fontSize: 11, marginBottom: SPACING.m },
   mediaRow: { marginBottom: SPACING.l },
   addMediaBtn: {
     width: 80,

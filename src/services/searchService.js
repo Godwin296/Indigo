@@ -61,6 +61,7 @@ export const searchService = {
         `*, author:profiles!posts_user_id_fkey (pseudo, avatar_url, verified_badge, rating_average, rating_count)`
       )
       .eq('status', 'active')
+      .or('valid_until.is.null,valid_until.gt.' + new Date().toISOString())
       .order('created_at', { ascending: false })
       .range(from, to);
 

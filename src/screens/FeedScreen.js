@@ -166,6 +166,7 @@ export default function FeedScreen({ navigation }) {
             avatar={post.author?.avatar_url}
             images={(post.media || []).map((m) => m.url)}
             isNew={Date.now() - new Date(post.created_at).getTime() < 24 * 60 * 60 * 1000}
+            isPromo={post.post_type === 'promotion'}
             likeCount={post.like_count || 0}
             commentCount={post.comment_count || 0}
             isLiked={likedPostIds.includes(post.id)}

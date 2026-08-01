@@ -63,6 +63,7 @@ export default function FeedPostCard({
   hashtags,
   price,
   isNew,
+  isPromo,
   likeCount = 0,
   commentCount = 0,
   isLiked = false,
@@ -108,6 +109,7 @@ export default function FeedPostCard({
           </View>
           <Text style={styles.location}>{location} • {time}</Text>
         </View>
+        {isPromo && <View style={styles.promoBadge}><Ionicons name="megaphone" size={11} color="#050530" /><Text style={styles.promoBadgeText}>PROMO</Text></View>}
         {isNew && <View style={styles.newBadge}><Text style={styles.newBadgeText}>Nouveau</Text></View>}
         <TouchableOpacity onPress={handleMenuPress}>
           <Ionicons name="ellipsis-vertical" size={20} color="white" />
@@ -171,6 +173,8 @@ const styles = StyleSheet.create({
   location: { color: COLORS.textMuted, fontSize: 12, marginTop: 2 },
   newBadge: { backgroundColor: COLORS.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 10 },
   newBadgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  promoBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E4B04E', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 10 },
+  promoBadgeText: { color: '#050530', fontSize: 10, fontWeight: 'bold' },
   postTitle: { color: 'white', fontWeight: '800', fontSize: 19, marginBottom: 8 },
   description: { color: COLORS.textSoft, fontSize: 14, lineHeight: 20 },
   price: { color: COLORS.gold, fontWeight: '700', fontSize: 14, marginTop: 8 },

@@ -1,36 +1,45 @@
 # Indigo — Roadmap
 
-Roadmap en 4 phases livrables. On ne passe à la phase suivante que quand la
-précédente est validée. Voir `docs/ARCHITECTURE.md` pour le détail des décisions
-techniques.
+Roadmap réordonnée suite au pivot de lancement (ADR-006, 20/07/2026) : on
+priorise la croissance de la communauté via une app de promotion locale,
+avant d'exposer Mode Contrat et monétisation. Voir `docs/ARCHITECTURE.md`
+pour le détail des décisions techniques.
 
-## Phase 0 — Fondations (en cours)
+## Phase 0 — Fondations ✅ Terminée
 - [x] Choix de stack (ADR-001, ADR-002)
 - [x] Schéma de données Module 1 (`profiles` / `profiles_private`)
-- [ ] Client Supabase + variables d'environnement
-- [ ] Auth (inscription/connexion) migrée vers Supabase
-- [ ] Règles de sécurité (RLS) posées et testées
-- [ ] Hook responsive mobile-first → desktop/PWA
+- [x] Client Supabase + variables d'environnement
+- [x] Auth (inscription/connexion) sur Supabase
+- [x] Règles de sécurité (RLS) posées sur toutes les tables
+- [x] Hook responsive mobile-first → desktop/PWA
 
-## Phase 1 — MVP social
-- [ ] Profil complet (entonnoir : vital → expertise) — `EditProfileScreen`
-- [ ] Feed + publication (Module 2) sur Supabase
-- [ ] Modération niveau 1 (filtre automatique, signalement communautaire)
-- [ ] Recherche basique (Module 3, sans scoring avancé)
+## Phase 1 — Croissance : l'app de promotion (priorité actuelle)
+- [x] Profil complet (entonnoir : vital → expertise) — `EditProfileScreen`
+- [x] Feed + publication (Module 2), likes/commentaires/partage
+- [x] Publications de type `promotion` (admin-only) avec date de validité
+- [x] Modération niveau 1 (filtre automatique, signalement communautaire)
+- [x] Recherche (Talents/Entreprises/Services/Offres/Promotions/Publications)
+- [x] Messagerie sociale (Module 4) pour réagir aux promos et discuter
+- [ ] Écran de profil public (consulter un tiers depuis recherche/publication)
+- [ ] Export PWA installable (service worker Workbox) — pour maximiser la portée
 
-## Phase 2 — Confiance & argent
-- [ ] Notation post-contrat (Module 2 §2)
-- [ ] Scoring côté serveur (Postgres function / Edge Function)
-- [ ] Messagerie 3 niveaux : Social / Professionnel / Contrat (Module 4)
-- [ ] Révélation d'identité réelle via RPC contractuelle (voir ADR-003)
-- [ ] Intégration Campay (Mobile Money) + abonnements (Module 5)
-
-## Phase 3 — Admin, croissance & robustesse
-- [ ] Export PWA installable (service worker Workbox)
-- [ ] Parrainage / Boost viral (Module 7)
+## Phase 2 — Rétention communautaire
+- [ ] Parrainage / Boost viral (Module 7) — prioritaire pour la croissance
 - [ ] Mode Data Saver (compression, cache local)
-- [ ] Gestion des litiges (Module 7)
-- [ ] Dashboard admin custom si Supabase Studio devient insuffisant (Module 6)
+- [ ] Admin/Modération : file de signalements, actions rapides (Module 6) —
+      plus important maintenant qu'il y a du contenu public à modérer
+
+## Phase 3 — Confiance progressive (déjà codée, restée discrète)
+- [x] Notation post-contrat (Module 2 §2)
+- [x] Messagerie 3 niveaux : Social / Professionnel / Contrat (Module 4)
+- [x] Révélation d'identité réelle via RPC contractuelle (ADR-003)
+- [x] Gestion des litiges (Module 7 §3)
+- [ ] Mettre ces fonctionnalités en avant dans l'UI, une fois la communauté là
+
+## Phase 4 — Monétisation (en pause volontaire, ADR-006)
+- [ ] Intégration Campay (Mobile Money) + abonnements (Module 5)
+- [ ] Scoring de crédibilité côté serveur (Module 3 §3) — pas fabriqué sans
+      données réelles pour le calibrer, voir ADR-005/006
 
 ## Points d'intégration post-fusion (à ne pas oublier)
 - ~~**Chantier B ↔ C** : bouton "Contacter" de `SearchScreen`~~ — **résolu**

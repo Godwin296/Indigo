@@ -34,6 +34,7 @@ export const postService = {
         neighborhood: profile?.neighborhood || null,
         media: uploadedMedia,
         is_urgent: postData.postType === 'urgence',
+        valid_until: postData.validUntil || null,
       })
       .select()
       .single();
@@ -56,6 +57,7 @@ export const postService = {
         )`
       )
       .eq('status', 'active')
+      .or('valid_until.is.null,valid_until.gt.' + new Date().toISOString())
       .order('created_at', { ascending: false })
       .range(from, to);
 

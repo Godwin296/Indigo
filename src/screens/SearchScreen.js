@@ -23,6 +23,7 @@ import { searchService } from '../services/searchService';
 import { chatService } from '../services/chatService';
 
 const TABS = [
+  { key: 'promotion', label: 'Promotions', icon: 'megaphone', kind: 'post', postType: 'promotion' },
   { key: 'particulier', label: 'Talents', icon: 'person', kind: 'profile' },
   { key: 'entreprise', label: 'Entreprises', icon: 'business', kind: 'profile' },
   { key: 'service', label: 'Services', icon: 'briefcase', kind: 'post', postType: 'service' },
@@ -36,7 +37,7 @@ export default function SearchScreen({ navigation }) {
   const { contentMaxWidth } = useResponsive();
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState('particulier');
+  const [activeTab, setActiveTab] = useState('promotion');
   const [query, setQuery] = useState('');
   const [city, setCity] = useState('');
   const [qualityOnly, setQualityOnly] = useState(false);
