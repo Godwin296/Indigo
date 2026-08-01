@@ -1,10 +1,7 @@
 // src/screens/SearchScreen.js
 // Module 3 : Moteur de recherche. Voir docs/ARCHITECTURE.md et la maquette
-// "Recherche" (image 5 fournie par Godwin).
-//
-// Onglets Talents/Entreprises : fonctionnels (table `profiles`, sur `main`).
-// Onglets Services/Offres/Publications : activés dès que le Chantier A
-// (Module 2, table `posts`) sera fusionné dans `main` — voir WORKSTREAMS.md.
+// "Recherche" (image 5 fournie par Godwin). Tous les onglets sont
+// fonctionnels depuis la fusion des Chantiers A/B/C dans main.
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
@@ -21,20 +18,23 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { useResponsive } from '../hooks/useResponsive';
+import { useAuth } from '../context/AuthContext';
 import { searchService } from '../services/searchService';
+import { chatService } from '../services/chatService';
 
 const TABS = [
-  { key: 'particulier', label: 'Talents', icon: 'person', ready: true },
-  { key: 'entreprise', label: 'Entreprises', icon: 'business', ready: true },
-  { key: 'service', label: 'Services', icon: 'briefcase', ready: false },
-  { key: 'offre', label: 'Offres', icon: 'bag-handle', ready: false },
-  { key: 'publication', label: 'Publications', icon: 'chatbubbles', ready: false },
+  { key: 'particulier', label: 'Talents', icon: 'person', kind: 'profile' },
+  { key: 'entreprise', label: 'Entreprises', icon: 'business', kind: 'profile' },
+  { key: 'service', label: 'Services', icon: 'briefcase', kind: 'post', postType: 'service' },
+  { key: 'offre', label: 'Offres', icon: 'bag-handle', kind: 'post', postType: 'offre_emploi' },
+  { key: 'publication', label: 'Publications', icon: 'chatbubbles', kind: 'post', postType: null },
 ];
 
 const MIN_RATING = 3.5;
 
-export default function SearchScreen() {
+export default function SearchScreen({ navigation }) {
   const { contentMaxWidth } = useResponsive();
+  const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState('particulier');
   const [query, setQuery] = useState('');
@@ -46,18 +46,23 @@ export default function SearchScreen() {
   const currentTab = TABS.find((t) => t.key === activeTab);
 
   const runSearch = useCallback(async () => {
-    if (!currentTab?.ready) {
-      setResults([]);
-      return;
-    }
     setLoading(true);
     try {
-      const data = await searchService.searchProfiles({
-        query,
-        accountType: activeTab,
-        city: city.trim() || undefined,
-        minRating: qualityOnly ? MIN_RATING : undefined,
-      });
+      let data;
+      if (currentTab.kind === 'profile') {
+        data = await searchService.searchProfiles({
+          query,
+          accountType: activeTab,
+          city: city.trim() || undefined,
+          minRating: qualityOnly ? MIN_RATING : undefined,
+        });
+      } else {
+        data = await searchService.searchPosts({
+          query,
+          postType: currentTab.postType || undefined,
+          city: city.trim() || undefined,
+        });
+      }
       setResults(data);
     } catch (e) {
       console.error('Erreur recherche:', e.message);
@@ -72,14 +77,23 @@ export default function SearchScreen() {
     return () => clearTimeout(timeout);
   }, [runSearch]);
 
-  const handleContact = () => {
-    // Le téléphone vit dans `profiles_private`, volontairement inaccessible
-    // aux autres utilisateurs (ADR-003) — le vrai contact passera par la
-    // messagerie in-app (Module 4, Chantier C), pas par un numéro exposé ici.
-    Alert.alert(
-      'Bientôt disponible',
-      'La messagerie interne arrive avec le Chantier C. En attendant, aucun contact direct n’est exposé — c’est voulu, voir docs/ARCHITECTURE.md (ADR-003).'
-    );
+  const handleContact = async (targetUserId) => {
+    if (!user?.id || !targetUserId) return;
+    if (targetUserId === user.id) return; // pas de conversation avec soi-même
+    try {
+      const conversation = await chatService.getOrCreateConversation(user.id, targetUserId, {
+        type: 'professional',
+      });
+      const otherId =
+        conversation.participant_a === user.id ? conversation.participant_b : conversation.participant_a;
+      navigation.navigate('Chat', {
+        conversationId: conversation.id,
+        conversationType: conversation.type,
+        otherParticipant: { id: otherId },
+      });
+    } catch (e) {
+      Alert.alert('Erreur', e.message);
+    }
   };
 
   return (
@@ -92,7 +106,7 @@ export default function SearchScreen() {
           <Ionicons name="search" size={18} color={COLORS.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Nom, compétence (ex: menuiserie)"
+            placeholder="Nom, compétence, mot-clé..."
             placeholderTextColor={COLORS.textMuted}
             value={query}
             onChangeText={setQuery}
@@ -112,12 +126,8 @@ export default function SearchScreen() {
           style={styles.tabsRow}
           renderItem={({ item }) => (
             <TouchableOpacity
-              onPress={() => item.ready && setActiveTab(item.key)}
-              style={[
-                styles.tab,
-                activeTab === item.key && styles.tabActive,
-                !item.ready && styles.tabDisabled,
-              ]}
+              onPress={() => setActiveTab(item.key)}
+              style={[styles.tab, activeTab === item.key && styles.tabActive]}
             >
               <Ionicons
                 name={item.icon}
@@ -139,33 +149,23 @@ export default function SearchScreen() {
             value={city}
             onChangeText={setCity}
           />
-          <TouchableOpacity
-            style={[styles.qualityChip, qualityOnly && styles.qualityChipActive]}
-            onPress={() => setQualityOnly((v) => !v)}
-          >
-            <Ionicons name="star" size={14} color={qualityOnly ? COLORS.text : COLORS.gold} />
-            <Text style={[styles.qualityChipText, qualityOnly && { color: COLORS.text }]}>
-              Note {MIN_RATING}+
-            </Text>
-          </TouchableOpacity>
+          {currentTab.kind === 'profile' && (
+            <TouchableOpacity
+              style={[styles.qualityChip, qualityOnly && styles.qualityChipActive]}
+              onPress={() => setQualityOnly((v) => !v)}
+            >
+              <Ionicons name="star" size={14} color={qualityOnly ? COLORS.text : COLORS.gold} />
+              <Text style={[styles.qualityChipText, qualityOnly && { color: COLORS.text }]}>
+                Note {MIN_RATING}+
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {!currentTab?.ready && (
-        <View style={styles.emptyState}>
-          <Ionicons name="construct-outline" size={36} color={COLORS.textMuted} />
-          <Text style={styles.emptyText}>
-            La recherche "{currentTab?.label}" arrive avec la fusion du Chantier A
-            (publications) — pas encore de données inventées ici.
-          </Text>
-        </View>
-      )}
+      {loading && <ActivityIndicator color={COLORS.primary} style={{ marginTop: 30 }} />}
 
-      {currentTab?.ready && loading && (
-        <ActivityIndicator color={COLORS.primary} style={{ marginTop: 30 }} />
-      )}
-
-      {currentTab?.ready && !loading && (
+      {!loading && (
         <FlatList
           data={results}
           keyExtractor={(item) => item.id}
@@ -176,39 +176,68 @@ export default function SearchScreen() {
               <Text style={styles.emptyText}>Aucun résultat pour cette recherche.</Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <View style={styles.resultCard}>
-              <Image
-                source={{ uri: item.avatar_url || 'https://i.pravatar.cc/150' }}
-                style={styles.resultAvatar}
-              />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <View style={styles.resultNameRow}>
-                  <Text style={styles.resultName}>{item.pseudo}</Text>
-                  {item.verified_badge && (
-                    <MaterialCommunityIcons name="check-decagram" size={14} color={COLORS.primary} style={{ marginLeft: 4 }} />
+          renderItem={({ item }) =>
+            currentTab.kind === 'profile' ? (
+              <View style={styles.resultCard}>
+                <Image
+                  source={{ uri: item.avatar_url || 'https://i.pravatar.cc/150' }}
+                  style={styles.resultAvatar}
+                />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <View style={styles.resultNameRow}>
+                    <Text style={styles.resultName}>{item.pseudo}</Text>
+                    {item.verified_badge && (
+                      <MaterialCommunityIcons name="check-decagram" size={14} color={COLORS.primary} style={{ marginLeft: 4 }} />
+                    )}
+                  </View>
+                  <Text style={styles.resultMeta}>
+                    {item.main_skill || 'Talent'} {item.experience_years ? `• ${item.experience_years} ans` : ''}
+                  </Text>
+                  <View style={styles.resultMetaRow}>
+                    <Ionicons name="location" size={12} color={COLORS.primary} />
+                    <Text style={styles.resultLocation}>{item.neighborhood || item.city}</Text>
+                  </View>
+                  <View style={styles.resultMetaRow}>
+                    <Ionicons name="star" size={12} color={COLORS.gold} />
+                    <Text style={styles.resultLocation}>
+                      {item.rating_average ? item.rating_average.toFixed(1) : '—'} ({item.rating_count || 0} avis)
+                      {'  '}• {item.contracts_completed || 0} contrats
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.callBtn} onPress={() => handleContact(item.id)}>
+                  <Ionicons name="chatbubble" size={18} color={COLORS.text} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.resultCard}>
+                <Image
+                  source={{ uri: item.media?.[0]?.url || item.author?.avatar_url || 'https://i.pravatar.cc/150' }}
+                  style={styles.resultAvatar}
+                />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <View style={styles.resultNameRow}>
+                    <Text style={styles.resultName} numberOfLines={1}>{item.title}</Text>
+                  </View>
+                  <Text style={styles.resultMeta} numberOfLines={2}>{item.description}</Text>
+                  <View style={styles.resultMetaRow}>
+                    <Ionicons name="person" size={12} color={COLORS.primary} />
+                    <Text style={styles.resultLocation}>
+                      {item.author?.pseudo || 'Utilisateur'} • {item.city}
+                    </Text>
+                  </View>
+                  {!!item.price && (
+                    <Text style={[styles.resultLocation, { color: COLORS.gold, marginTop: 3 }]}>
+                      Dès {item.price} FCFA
+                    </Text>
                   )}
                 </View>
-                <Text style={styles.resultMeta}>
-                  {item.main_skill || 'Talent'} {item.experience_years ? `• ${item.experience_years} ans` : ''}
-                </Text>
-                <View style={styles.resultMetaRow}>
-                  <Ionicons name="location" size={12} color={COLORS.primary} />
-                  <Text style={styles.resultLocation}>{item.neighborhood || item.city}</Text>
-                </View>
-                <View style={styles.resultMetaRow}>
-                  <Ionicons name="star" size={12} color={COLORS.gold} />
-                  <Text style={styles.resultLocation}>
-                    {item.rating_average ? item.rating_average.toFixed(1) : '—'} ({item.rating_count || 0} avis)
-                    {'  '}• {item.contracts_completed || 0} contrats
-                  </Text>
-                </View>
+                <TouchableOpacity style={styles.callBtn} onPress={() => handleContact(item.user_id)}>
+                  <Ionicons name="chatbubble" size={18} color={COLORS.text} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.callBtn} onPress={handleContact}>
-                <Ionicons name="chatbubble" size={18} color={COLORS.text} />
-              </TouchableOpacity>
-            </View>
-          )}
+            )
+          }
         />
       )}
     </SafeAreaView>
@@ -244,7 +273,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   tabActive: { backgroundColor: COLORS.primary },
-  tabDisabled: { opacity: 0.4 },
   tabLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '600' },
   tabLabelActive: { color: COLORS.text },
   filtersRow: { flexDirection: 'row', gap: 10, marginTop: 14, marginBottom: 8, alignItems: 'center' },
