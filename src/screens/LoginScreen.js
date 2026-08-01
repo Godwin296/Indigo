@@ -29,6 +29,15 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
+  const handleGooglePress = () => {
+    // La connexion Google nécessite de configurer le provider OAuth côté
+    // Supabase (Google Cloud Console : Client ID/Secret) — pas encore fait.
+    // On informe plutôt que d'avoir un bouton silencieusement inactif.
+    alert(
+      'Connexion Google bientôt disponible — la configuration côté Supabase reste à faire. Utilise ton email pour l’instant.'
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Fond dégradé sombre identique à la maquette */}
@@ -57,21 +66,14 @@ export default function LoginScreen({ navigation }) {
             {/* 2. Formulaire */}
             <View style={styles.formContainer}>
               <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Numéro de téléphone</Text>
-                <View style={styles.phoneInputRow}>
-                  <View style={styles.countryPicker}>
-                    <Image source={{ uri: 'https://flagcdn.com/w40/cm.png' }} style={styles.flag} />
-                    <Text style={styles.countryCode}>+237</Text>
-                    <Ionicons name="chevron-down" size={14} color="#FFF" />
-                  </View>
-                  <InputField 
-                    placeholder="6 75 12 34 56"
-                    value={email} // Ou téléphone selon ta logique Firebase
-                    onChangeText={setEmail}
-                    keyboardType="phone-pad"
-                    containerStyle={styles.flexInput}
-                  />
-                </View>
+                <Text style={styles.label}>Email</Text>
+                <InputField
+                  placeholder="ton@email.com"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
               </View>
 
               <View style={styles.inputWrapper}>
@@ -125,9 +127,7 @@ export default function LoginScreen({ navigation }) {
             </View>
 
             <View style={styles.socialRow}>
-              <SocialBtn icon="google" color="#DB4437" />
-              <SocialBtn icon="facebook" color="#4267B2" />
-              <SocialBtn icon="apple" color="#FFF" />
+              <SocialBtn icon="google" color="#DB4437" onPress={handleGooglePress} />
             </View>
 
             {/* 4. Pied de page sécurisé */}
@@ -157,8 +157,8 @@ export default function LoginScreen({ navigation }) {
 }
 
 // Petit composant interne pour les boutons sociaux
-const SocialBtn = ({ icon, color }) => (
-  <TouchableOpacity style={styles.socialIconBox}>
+const SocialBtn = ({ icon, color, onPress }) => (
+  <TouchableOpacity style={styles.socialIconBox} onPress={onPress}>
     <MaterialCommunityIcons name={icon} size={24} color={color} />
   </TouchableOpacity>
 );
@@ -176,14 +176,6 @@ const styles = StyleSheet.create({
   formContainer: { width: '100%' },
   inputWrapper: { marginBottom: 15 },
   label: { color: '#FFF', fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  phoneInputRow: { flexDirection: 'row', alignItems: 'center' },
-  countryPicker: { 
-    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', 
-    height: 55, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' 
-  },
-  flag: { width: 24, height: 16, marginRight: 8, borderRadius: 2 },
-  countryCode: { color: '#FFF', marginRight: 5, fontSize: 14 },
-  flexInput: { flex: 1, marginLeft: 10 },
   forgotPass: { alignSelf: 'flex-end', marginTop: 5 },
   forgotText: { color: '#E4B04E', fontSize: 13 },
   rememberRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20 },

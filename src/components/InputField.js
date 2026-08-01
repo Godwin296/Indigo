@@ -6,7 +6,7 @@ import { SECURITY_INFO } from '../utils/validators';
 import Toast from 'react-native-root-toast';
 
 
-const InputField = ({ error, secureTextEntry, onChangeText, maxLength = 50, ...props }) => {
+const InputField = ({ error, secureTextEntry, onChangeText, maxLength = 50, showSecurityInfo = false, ...props }) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   // LA FONCTION MANQUANTE
@@ -56,10 +56,13 @@ const InputField = ({ error, secureTextEntry, onChangeText, maxLength = 50, ...p
           {...props} 
         />
 
-        {/* Icône d'information sur la sécurité */}
-        <TouchableOpacity onPress={showInfo} style={styles.iconPadding}>
-          <Ionicons name="information-circle-outline" size={20} color={COLORS.indigoLight} />
-        </TouchableOpacity>
+        {/* Icône d'information sur la sécurité — seulement si demandée
+            explicitement (showSecurityInfo), pas sur chaque champ */}
+        {showSecurityInfo && (
+          <TouchableOpacity onPress={showInfo} style={styles.iconPadding}>
+            <Ionicons name="information-circle-outline" size={20} color={COLORS.indigoLight} />
+          </TouchableOpacity>
+        )}
         
         {secureTextEntry && (
           <TouchableOpacity 
