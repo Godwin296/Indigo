@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, KeyboardAvoidingView, Platform, 
-  TouchableOpacity, Image, Dimensions 
+  TouchableOpacity, Image, ScrollView 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,12 +9,9 @@ import { COLORS, SPACING } from '../theme/theme';
 import { authService } from '../services/AuthService';
 import InputField from '../components/InputField';
 
-const { width } = Dimensions.get('window');
-
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -47,7 +44,11 @@ export default function LoginScreen({ navigation }) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
           style={{ flex: 1 }}
         >
-          <View style={styles.innerContent}>
+          <ScrollView
+            contentContainerStyle={styles.innerContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             
             {/* 1. Header & Logo */}
             <View style={styles.header}>
@@ -89,17 +90,6 @@ export default function LoginScreen({ navigation }) {
 
               <TouchableOpacity style={styles.forgotPass}>
                 <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
-              </TouchableOpacity>
-
-              {/* Checkbox "Se souvenir de moi" */}
-              <TouchableOpacity 
-                style={styles.rememberRow} 
-                onPress={() => setRememberMe(!rememberMe)}
-              >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
-                  {rememberMe && <Ionicons name="checkmark" size={12} color="#FFF" />}
-                </View>
-                <Text style={styles.rememberText}>Se souvenir de moi</Text>
               </TouchableOpacity>
 
               {/* Bouton de Connexion Doré */}
@@ -149,7 +139,7 @@ export default function LoginScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
 
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
     </View>
@@ -166,26 +156,22 @@ const SocialBtn = ({ icon, color, onPress }) => (
 const styles = StyleSheet.create({
   container: { flex: 1 },
   background: { flex: 1 },
-  innerContent: { flex: 1, paddingHorizontal: 30, justifyContent: 'center' },
-  header: { alignItems: 'center', marginBottom: 40 },
-  logoWrapper: { width: 80, height: 80, marginBottom: 10 },
+  innerContent: { flexGrow: 1, paddingHorizontal: 30, paddingVertical: 24, justifyContent: 'center' },
+  header: { alignItems: 'center', marginBottom: 24 },
+  logoWrapper: { width: 60, height: 60, marginBottom: 6 },
   logo: { width: '100%', height: '100%' },
-  brandTitle: { color: '#FFF', fontSize: 48, fontWeight: 'bold' },
-  brandSubtitle: { color: '#E4B04E', fontSize: 14, letterSpacing: 5, marginTop: -10, marginBottom: 20 },
-  welcomeText: { color: '#AAA', fontSize: 16 },
+  brandTitle: { color: '#FFF', fontSize: 36, fontWeight: 'bold' },
+  brandSubtitle: { color: '#E4B04E', fontSize: 12, letterSpacing: 4, marginTop: -6, marginBottom: 12 },
+  welcomeText: { color: '#AAA', fontSize: 14 },
   formContainer: { width: '100%' },
   inputWrapper: { marginBottom: 15 },
   label: { color: '#FFF', fontSize: 14, fontWeight: '600', marginBottom: 8 },
   forgotPass: { alignSelf: 'flex-end', marginTop: 5 },
   forgotText: { color: '#E4B04E', fontSize: 13 },
-  rememberRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
-  checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: '#FFF', marginRight: 10, justifyContent: 'center', alignItems: 'center' },
-  checkboxActive: { backgroundColor: '#3F37C9', borderColor: '#3F37C9' },
-  rememberText: { color: '#AAA', fontSize: 13 },
-  loginButton: { height: 60, borderRadius: 30, overflow: 'hidden', marginTop: 30 },
+  loginButton: { height: 56, borderRadius: 28, overflow: 'hidden', marginTop: 18 },
   buttonGradient: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   buttonText: { color: '#000', fontSize: 18, fontWeight: 'bold', marginRight: 10 },
-  separatorRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 30 },
+  separatorRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
   line: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
   separatorText: { color: '#666', marginHorizontal: 15, fontSize: 12 },
   socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
@@ -195,12 +181,12 @@ const styles = StyleSheet.create({
   },
   secureBanner: { 
     flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', 
-    padding: 15, borderRadius: 15, marginTop: 40, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' 
+    padding: 15, borderRadius: 15, marginTop: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' 
   },
   secureTextContent: { flex: 1, marginLeft: 15 },
   secureTitle: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
   secureSub: { color: '#666', fontSize: 11 },
-  signupLink: { marginTop: 30, alignItems: 'center' },
+  signupLink: { marginTop: 20, marginBottom: 10, alignItems: 'center' },
   footerText: { color: '#AAA', fontSize: 14 },
   footerTextBold: { color: '#E4B04E', fontWeight: 'bold' }
 });

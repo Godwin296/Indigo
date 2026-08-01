@@ -24,6 +24,16 @@ en premier. Sur web/desktop, on ne "réétire" pas les composants dans le vide �
 centre le contenu dans une colonne de largeur contrainte (comme X/Twitter ou LinkedIn
 en version desktop), via le hook `useResponsive` (`src/hooks/useResponsive.js`).
 
+**Règle systématique (ajoutée le 21/07/2026, suite à un bug réel sur
+`LoginScreen`)** : tout écran avec plusieurs éléments verticaux (formulaire,
+liste de champs...) doit être enveloppé dans un `ScrollView`
+(`keyboardShouldPersistTaps="handled"`), jamais un simple `View` avec
+`justifyContent: 'center'`. Sur un écran physique plus petit que prévu, un
+contenu qui déborde d'un `View` non scrollable devient définitivement
+inatteignable — pas juste moche, littéralement impossible à toucher. C'était
+le cas de `LoginScreen` (corrigé) ; à vérifier systématiquement sur tout
+nouvel écran.
+
 ---
 
 ## ADR-002 — Backend : Supabase (Postgres) plutôt que Firebase
