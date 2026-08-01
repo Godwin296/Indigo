@@ -33,13 +33,12 @@ techniques.
 - [ ] Dashboard admin custom si Supabase Studio devient insuffisant (Module 6)
 
 ## Points d'intégration post-fusion (à ne pas oublier)
-- **Chantier B ↔ C** : le bouton "Contacter" de `SearchScreen` (Chantier B)
-  affiche actuellement un message "bientôt disponible" car la messagerie
-  n'existait pas encore. Une fois B et C fusionnés dans `main`, le brancher sur
-  `chatService.getOrCreateConversation(...)` + `navigation.navigate('Chat', ...)`.
-- **Chantier A ↔ C** : idem pour le bouton "Contacter" d'un profil consulté
-  (pas encore d'écran de profil public pour un tiers — seul le profil de
-  l'utilisateur connecté existe pour l'instant).
+- ~~**Chantier B ↔ C** : bouton "Contacter" de `SearchScreen`~~ — **résolu**
+  (branché sur `chatService.getOrCreateConversation` + navigation vers `Chat`).
+- **Chantier A ↔ C** : toujours ouvert — pas encore d'écran de profil public
+  pour un tiers (seul le profil de l'utilisateur connecté existe). À faire :
+  un écran `PublicProfileScreen` accessible depuis les résultats de recherche
+  et les publications, avec un bouton "Contacter" branché de la même manière.
 
 ## Backlog (reporté, pas oublié)
 - Scroll infini sur le feed (à la Facebook/Instagram) au lieu du simple
