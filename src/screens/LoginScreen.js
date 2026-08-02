@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, KeyboardAvoidingView, Platform, 
-  TouchableOpacity, Image, ScrollView 
+  TouchableOpacity, Image, ScrollView, Alert 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,24 +15,28 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) return alert("Veuillez remplir tous les champs.");
+    if (!email || !password) return Alert.alert('Champs requis', 'Veuillez remplir tous les champs.');
     setLoading(true);
     try {
       await authService.login(email, password);
     } catch (error) {
-      alert("Erreur de connexion : " + error.message);
+      Alert.alert('Erreur de connexion', error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGooglePress = () => {
-    // La connexion Google nécessite de configurer le provider OAuth côté
-    // Supabase (Google Cloud Console : Client ID/Secret) — pas encore fait.
-    // On informe plutôt que d'avoir un bouton silencieusement inactif.
-    alert(
-      'Connexion Google bientôt disponible — la configuration côté Supabase reste à faire. Utilise ton email pour l’instant.'
-    );
+  const handleGooglePress = async () => {
+    setLoading(true);
+    try {
+      await authService.loginWithGoogle();
+      // La navigation suit automatiquement : AuthContext détecte la nouvelle
+      // session via onAuthStateChange (voir src/context/AuthContext.js).
+    } catch (error) {
+      Alert.alert('Connexion Google', error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

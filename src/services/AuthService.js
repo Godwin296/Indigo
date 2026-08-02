@@ -12,12 +12,31 @@
 // confirmation (Phase 1).
 import { supabase } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 
 // Normalise le "level" du formulaire d'inscription vers le schéma DB
 // (particulier_level: 'etudiant' | 'travailleur' | null). Voir SignupScreen.js.
 const toParticulierLevel = (accountType, level) => {
   if (accountType?.toUpperCase() !== 'PARTICULIER') return null;
   return level?.toUpperCase() === 'ETUDIANT' ? 'etudiant' : 'travailleur';
+};
+
+// Les tokens OAuth reviennent dans le fragment (#access_token=...) ou parfois
+// en query (?code=...) selon le flux — on gère les deux avec URLSearchParams
+// (polyfillé globalement via react-native-url-polyfill, voir src/lib/supabase.js).
+const parseUrlParams = (url) => {
+  const raw = url.includes('#') ? url.split('#')[1] : url.split('?')[1];
+  if (!raw) return {};
+  return Object.fromEntries(new URLSearchParams(raw));
+};
+
+// Crée un pseudo de départ à partir du nom Google, pour ne pas laisser le
+// profil vide — modifiable ensuite depuis EditProfileScreen (étape Expertise
+// de l'entonnoir, Module 1 §2).
+const pseudoFromGoogleName = (name, email) => {
+  const base = (name || email?.split('@')[0] || 'Utilisateur').trim();
+  return base.slice(0, 20);
 };
 
 export const authService = {
@@ -86,5 +105,71 @@ export const authService = {
   logout: async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+  },
+
+  /**
+   * Connexion Google (OAuth). Ouvre le navigateur système pour
+   * l'authentification Google, récupère la session Supabase au retour, et
+   * crée le profil minimal si c'est la première connexion de cet utilisateur
+   * (Google ne passe pas par notre formulaire d'inscription habituel).
+   *
+   * ⚠️ Dans Expo Go (développement), le lien de retour utilise le proxy
+   * exp://... propre à Expo Go — ça fonctionne, mais un build autonome
+   * (EAS/dev client) sera plus fiable en production, voir docs/ARCHITECTURE.md.
+   */
+  loginWithGoogle: async () => {
+    const redirectTo = Linking.createURL('auth/callback');
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error) throw error;
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      throw new Error('Connexion Google annulée.');
+    }
+    if (result.type !== 'success' || !result.url) {
+      throw new Error('La connexion Google a échoué, réessaie.');
+    }
+
+    const params = parseUrlParams(result.url);
+    if (params.error_description) throw new Error(params.error_description);
+    if (!params.access_token) throw new Error('Aucun token reçu de Google.');
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+      access_token: params.access_token,
+      refresh_token: params.refresh_token,
+    });
+    if (sessionError) throw sessionError;
+
+    const user = sessionData.user;
+
+    // Première connexion Google : pas encore de ligne `profiles` (créée
+    // habituellement par register()) — on en crée une minimale ici.
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!existingProfile) {
+      const googleName = user.user_metadata?.full_name || user.user_metadata?.name;
+      const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: user.id,
+        pseudo: pseudoFromGoogleName(googleName, user.email),
+        avatar_url: googleAvatar || null,
+        account_type: 'particulier',
+      });
+      if (profileError) throw profileError;
+
+      await supabase.from('profiles_private').update({ email: user.email }).eq('id', user.id);
+    }
+
+    return user;
   },
 };

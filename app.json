@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Indigo",
+    "slug": "indigo-touco",
+    "scheme": "indigo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.godwin296.indigo"
+    },
+    "android": {
+      "package": "com.godwin296.indigo"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

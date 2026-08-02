@@ -248,6 +248,31 @@ pour ne pas exposer ça). Une seule fois, manuellement, dans Supabase Studio →
 Table Editor → `profiles` → trouver ta ligne → changer `account_type` en
 `admin`. C'est tout.
 
+## ADR-007 — Connexion Google (OAuth)
+
+**Décision** (21/07/2026) : ajout de la connexion Google via Supabase Auth,
+en plus d'email/mot de passe (ADR-002 inchangé pour le reste).
+
+**Code** : `authService.loginWithGoogle()` (`src/services/AuthService.js`)
+ouvre le navigateur système (`expo-web-browser`), récupère la session au
+retour via deep link (`expo-linking`, nécessite `app.json` → `scheme: "indigo"`,
+créé à cette occasion — le projet n'en avait aucun jusque-là). Si c'est la
+première connexion de la personne (pas de ligne `profiles`), un profil minimal
+est créé automatiquement à partir du nom/photo Google — à compléter ensuite
+via `EditProfileScreen` (étape Expertise de l'entonnoir, Module 1 §2).
+
+**Configuration manuelle requise côté Supabase (en plus du provider)** :
+`Authentication → URL Configuration → Redirect URLs`, ajouter l'URL de
+redirection de l'app (générée par `Linking.createURL('auth/callback')`) —
+sinon Google refuse de rediriger vers l'app avec une erreur "requested path
+is invalid".
+
+**Limite connue** : dans Expo Go (développement), le retour OAuth passe par
+le proxy `exp://...` propre à Expo Go, qui change selon le réseau/l'appareil
+— ça fonctionne mais peut être moins stable qu'en build autonome (EAS / dev
+client). À garder en tête si la connexion Google se comporte bizarrement en
+dev — pas forcément un bug de code.
+
 ## Historique
 
 - 2026-07-20 — ADR-006 : pivot de lancement (app de promotion, croissance
