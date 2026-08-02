@@ -9,6 +9,15 @@ import { COLORS, SPACING } from '../theme/theme';
 import { authService } from '../services/AuthService';
 import InputField from '../components/InputField';
 
+// Providers OAuth prévus. GitHub et LinkedIn sont branchés dès maintenant
+// (code réel, pas décoratif) mais échoueront proprement tant que Godwin n'a
+// pas activé ces providers côté Supabase — voir ADR-007.
+const SOCIAL_PROVIDERS = [
+  { key: 'google', icon: 'google', color: '#DB4437', label: 'Google' },
+  { key: 'github', icon: 'github', color: '#FFFFFF', label: 'GitHub' },
+  { key: 'linkedin', icon: 'linkedin', color: '#0A66C2', label: 'LinkedIn' },
+];
+
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,14 +35,16 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
-  const handleGooglePress = async () => {
+  const handleSocialPress = async (providerKey) => {
     setLoading(true);
     try {
-      await authService.loginWithGoogle();
+      if (providerKey === 'google') await authService.loginWithGoogle();
+      else if (providerKey === 'github') await authService.loginWithGithub();
+      else if (providerKey === 'linkedin') await authService.loginWithLinkedIn();
       // La navigation suit automatiquement : AuthContext détecte la nouvelle
       // session via onAuthStateChange (voir src/context/AuthContext.js).
     } catch (error) {
-      Alert.alert('Connexion Google', error.message);
+      Alert.alert('Connexion', error.message);
     } finally {
       setLoading(false);
     }
@@ -41,9 +52,7 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Fond dégradé sombre identique à la maquette */}
       <LinearGradient colors={['#050530', '#02021A']} style={styles.background}>
-        
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
           style={{ flex: 1 }}
@@ -53,12 +62,11 @@ export default function LoginScreen({ navigation }) {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            
-            {/* 1. Header & Logo */}
+            {/* Header & Logo — compact pour tenir sur un petit écran */}
             <View style={styles.header}>
               <View style={styles.logoWrapper}>
                  <Image 
-                  source={require('../assets/logo_indigo.png')} // Assure-toi d'avoir le logo IN
+                  source={require('../assets/logo_indigo.png')}
                   style={styles.logo}
                   resizeMode="contain"
                 />
@@ -68,7 +76,6 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.welcomeText}>Connectez-vous pour continuer</Text>
             </View>
 
-            {/* 2. Formulaire */}
             <View style={styles.formContainer}>
               <View style={styles.inputWrapper}>
                 <Text style={styles.label}>Email</Text>
@@ -96,7 +103,6 @@ export default function LoginScreen({ navigation }) {
                 <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
               </TouchableOpacity>
 
-              {/* Bouton de Connexion Doré */}
               <TouchableOpacity 
                 style={styles.loginButton} 
                 onPress={handleLogin} 
@@ -113,7 +119,6 @@ export default function LoginScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* 3. Séparateur Social */}
             <View style={styles.separatorRow}>
               <View style={styles.line} />
               <Text style={styles.separatorText}>ou continuer avec</Text>
@@ -121,17 +126,9 @@ export default function LoginScreen({ navigation }) {
             </View>
 
             <View style={styles.socialRow}>
-              <SocialBtn icon="google" color="#DB4437" onPress={handleGooglePress} />
-            </View>
-
-            {/* 4. Pied de page sécurisé */}
-            <View style={styles.secureBanner}>
-               <Ionicons name="shield-checkmark-outline" size={24} color="#5C5CFF" />
-               <View style={styles.secureTextContent}>
-                  <Text style={styles.secureTitle}>Connexion sécurisée</Text>
-                  <Text style={styles.secureSub}>Vos données sont protégées et chiffrées.</Text>
-               </View>
-               <Ionicons name="lock-closed" size={16} color="#444" />
+              {SOCIAL_PROVIDERS.map((p) => (
+                <SocialBtn key={p.key} icon={p.icon} color={p.color} onPress={() => handleSocialPress(p.key)} />
+              ))}
             </View>
 
             <TouchableOpacity 
@@ -150,47 +147,39 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-// Petit composant interne pour les boutons sociaux
 const SocialBtn = ({ icon, color, onPress }) => (
   <TouchableOpacity style={styles.socialIconBox} onPress={onPress}>
-    <MaterialCommunityIcons name={icon} size={24} color={color} />
+    <MaterialCommunityIcons name={icon} size={22} color={color} />
   </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   background: { flex: 1 },
-  innerContent: { flexGrow: 1, paddingHorizontal: 30, paddingVertical: 24, justifyContent: 'center' },
-  header: { alignItems: 'center', marginBottom: 24 },
-  logoWrapper: { width: 60, height: 60, marginBottom: 6 },
+  innerContent: { flexGrow: 1, paddingHorizontal: 30, paddingTop: 20, paddingBottom: 16 },
+  header: { alignItems: 'center', marginBottom: 18 },
+  logoWrapper: { width: 48, height: 48, marginBottom: 4 },
   logo: { width: '100%', height: '100%' },
-  brandTitle: { color: '#FFF', fontSize: 36, fontWeight: 'bold' },
-  brandSubtitle: { color: '#E4B04E', fontSize: 12, letterSpacing: 4, marginTop: -6, marginBottom: 12 },
-  welcomeText: { color: '#AAA', fontSize: 14 },
+  brandTitle: { color: '#FFF', fontSize: 28, fontWeight: 'bold' },
+  brandSubtitle: { color: '#E4B04E', fontSize: 11, letterSpacing: 4, marginTop: -4, marginBottom: 8 },
+  welcomeText: { color: '#AAA', fontSize: 13 },
   formContainer: { width: '100%' },
-  inputWrapper: { marginBottom: 15 },
-  label: { color: '#FFF', fontSize: 14, fontWeight: '600', marginBottom: 8 },
-  forgotPass: { alignSelf: 'flex-end', marginTop: 5 },
-  forgotText: { color: '#E4B04E', fontSize: 13 },
-  loginButton: { height: 56, borderRadius: 28, overflow: 'hidden', marginTop: 18 },
+  inputWrapper: { marginBottom: 12 },
+  label: { color: '#FFF', fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  forgotPass: { alignSelf: 'flex-end', marginTop: 4 },
+  forgotText: { color: '#E4B04E', fontSize: 12 },
+  loginButton: { height: 50, borderRadius: 25, overflow: 'hidden', marginTop: 14 },
   buttonGradient: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  buttonText: { color: '#000', fontSize: 18, fontWeight: 'bold', marginRight: 10 },
-  separatorRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
+  buttonText: { color: '#000', fontSize: 16, fontWeight: 'bold', marginRight: 10 },
+  separatorRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16 },
   line: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
-  separatorText: { color: '#666', marginHorizontal: 15, fontSize: 12 },
-  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
+  separatorText: { color: '#666', marginHorizontal: 12, fontSize: 11 },
+  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 14 },
   socialIconBox: { 
-    width: 65, height: 55, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, 
+    width: 56, height: 48, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, 
     justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' 
   },
-  secureBanner: { 
-    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', 
-    padding: 15, borderRadius: 15, marginTop: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' 
-  },
-  secureTextContent: { flex: 1, marginLeft: 15 },
-  secureTitle: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
-  secureSub: { color: '#666', fontSize: 11 },
-  signupLink: { marginTop: 20, marginBottom: 10, alignItems: 'center' },
-  footerText: { color: '#AAA', fontSize: 14 },
+  signupLink: { marginTop: 18, alignItems: 'center' },
+  footerText: { color: '#AAA', fontSize: 13 },
   footerTextBold: { color: '#E4B04E', fontWeight: 'bold' }
 });

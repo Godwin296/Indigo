@@ -34,7 +34,7 @@ const parseUrlParams = (url) => {
 // Crée un pseudo de départ à partir du nom Google, pour ne pas laisser le
 // profil vide — modifiable ensuite depuis EditProfileScreen (étape Expertise
 // de l'entonnoir, Module 1 §2).
-const pseudoFromGoogleName = (name, email) => {
+const pseudoFromProviderName = (name, email) => {
   const base = (name || email?.split('@')[0] || 'Utilisateur').trim();
   return base.slice(0, 20);
 };
@@ -108,20 +108,21 @@ export const authService = {
   },
 
   /**
-   * Connexion Google (OAuth). Ouvre le navigateur système pour
-   * l'authentification Google, récupère la session Supabase au retour, et
-   * crée le profil minimal si c'est la première connexion de cet utilisateur
-   * (Google ne passe pas par notre formulaire d'inscription habituel).
+   * Connexion OAuth générique (Google/GitHub/LinkedIn...). Ouvre le
+   * navigateur système, récupère la session au retour, crée le profil
+   * minimal si c'est la première connexion. `provider` doit être un
+   * identifiant Supabase valide : 'google', 'github', 'linkedin_oidc'
+   * (LinkedIn a migré vers OIDC — 'linkedin' seul seul ne fonctionne plus).
    *
    * ⚠️ Dans Expo Go (développement), le lien de retour utilise le proxy
    * exp://... propre à Expo Go — ça fonctionne, mais un build autonome
    * (EAS/dev client) sera plus fiable en production, voir docs/ARCHITECTURE.md.
    */
-  loginWithGoogle: async () => {
+  loginWithProvider: async (provider) => {
     const redirectTo = Linking.createURL('auth/callback');
 
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: { redirectTo, skipBrowserRedirect: true },
     });
     if (error) throw error;
@@ -129,15 +130,15 @@ export const authService = {
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
     if (result.type === 'cancel' || result.type === 'dismiss') {
-      throw new Error('Connexion Google annulée.');
+      throw new Error('Connexion annulée.');
     }
     if (result.type !== 'success' || !result.url) {
-      throw new Error('La connexion Google a échoué, réessaie.');
+      throw new Error('La connexion a échoué, réessaie.');
     }
 
     const params = parseUrlParams(result.url);
     if (params.error_description) throw new Error(params.error_description);
-    if (!params.access_token) throw new Error('Aucun token reçu de Google.');
+    if (!params.access_token) throw new Error('Aucun token reçu.');
 
     const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
       access_token: params.access_token,
@@ -147,8 +148,8 @@ export const authService = {
 
     const user = sessionData.user;
 
-    // Première connexion Google : pas encore de ligne `profiles` (créée
-    // habituellement par register()) — on en crée une minimale ici.
+    // Première connexion via ce provider : pas encore de ligne `profiles`
+    // (créée habituellement par register()) — on en crée une minimale ici.
     const { data: existingProfile } = await supabase
       .from('profiles')
       .select('id')
@@ -156,13 +157,14 @@ export const authService = {
       .maybeSingle();
 
     if (!existingProfile) {
-      const googleName = user.user_metadata?.full_name || user.user_metadata?.name;
-      const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture;
+      const meta = user.user_metadata || {};
+      const providerName = meta.full_name || meta.name || meta.user_name || meta.preferred_username;
+      const providerAvatar = meta.avatar_url || meta.picture;
 
       const { error: profileError } = await supabase.from('profiles').insert({
         id: user.id,
-        pseudo: pseudoFromGoogleName(googleName, user.email),
-        avatar_url: googleAvatar || null,
+        pseudo: pseudoFromProviderName(providerName, user.email),
+        avatar_url: providerAvatar || null,
         account_type: 'particulier',
       });
       if (profileError) throw profileError;
@@ -172,4 +174,8 @@ export const authService = {
 
     return user;
   },
+
+  loginWithGoogle: () => authService.loginWithProvider('google'),
+  loginWithGithub: () => authService.loginWithProvider('github'),
+  loginWithLinkedIn: () => authService.loginWithProvider('linkedin_oidc'),
 };
