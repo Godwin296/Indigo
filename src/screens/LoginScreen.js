@@ -156,9 +156,9 @@ const SocialBtn = ({ icon, color, onPress }) => (
 const styles = StyleSheet.create({
   container: { flex: 1 },
   background: { flex: 1 },
-  innerContent: { flexGrow: 1, paddingHorizontal: 30, paddingTop: 20, paddingBottom: 16 },
-  header: { alignItems: 'center', marginBottom: 18 },
-  logoWrapper: { width: 48, height: 48, marginBottom: 4 },
+  innerContent: { flexGrow: 1, paddingHorizontal: 30, paddingTop: 30, paddingBottom: 16, justifyContent: 'center' },
+  header: { alignItems: 'center', marginBottom: 22 },
+  logoWrapper: { width: 60, height: 60, marginBottom: 6 },
   logo: { width: '100%', height: '100%' },
   brandTitle: { color: '#FFF', fontSize: 28, fontWeight: 'bold' },
   brandSubtitle: { color: '#E4B04E', fontSize: 11, letterSpacing: 4, marginTop: -4, marginBottom: 8 },

@@ -10,7 +10,7 @@
 // profil, et la policy RLS "profiles_insert_own" refusera l'écriture). En
 // production, on préférera confirmer l'email puis créer le profil après
 // confirmation (Phase 1).
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAnonKeyPublic } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -127,7 +127,14 @@ export const authService = {
     });
     if (error) throw error;
 
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    // Correctif connu du flux OAuth Expo/Supabase : l'URL d'autorisation
+    // doit porter la clé publique en paramètre pour être ouverte directement
+    // dans le navigateur système (sinon "No API key found in request").
+    const authorizeUrl = data.url.includes('apikey=')
+      ? data.url
+      : `${data.url}${data.url.includes('?') ? '&' : '?'}apikey=${supabaseAnonKeyPublic}`;
+
+    const result = await WebBrowser.openAuthSessionAsync(authorizeUrl, redirectTo);
 
     if (result.type === 'cancel' || result.type === 'dismiss') {
       throw new Error('Connexion annulée.');

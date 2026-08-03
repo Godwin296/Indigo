@@ -22,6 +22,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+export const supabaseAnonKeyPublic = supabaseAnonKey;
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: AsyncStorage,
